@@ -944,30 +944,46 @@ app.post('/api/login', async (req, res) => {
   await seedDemoData()
   const { username, password } = req.body
 
+  const demoUser = users.find((item) => item.username === username && item.password === password)
+
   if (supabaseAuthEnabled) {
     const { data, error } = await supabasePublic.auth.signInWithPassword({
       email: username,
       password,
     })
 
-    if (error || !data.session || !data.user) {
-      res.status(401).json({ error: 'INVALID_CREDENTIALS' })
+    if (!error && data.session && data.user) {
+      res.json({
+        token: data.session.access_token,
+        user: {
+          id: data.user.id,
+          username: data.user.email || username,
+          name: data.user.user_metadata?.name || data.user.email || username,
+        },
+      })
       return
     }
 
-    res.json({
-      token: data.session.access_token,
-      user: {
-        id: data.user.id,
-        username: data.user.email || username,
-        name: data.user.user_metadata?.name || data.user.email || username,
-      },
-    })
+    // Keep the built-in demo account usable even after switching to Supabase auth.
+    if (demoUser) {
+      const token = crypto.randomUUID()
+      userTokens.set(token, demoUser.id)
+      res.json({
+        token,
+        user: {
+          id: demoUser.id,
+          username: demoUser.username,
+          name: demoUser.name,
+        },
+      })
+      return
+    }
+
+    res.status(401).json({ error: 'INVALID_CREDENTIALS' })
     return
   }
 
-  const user = users.find((item) => item.username === username && item.password === password)
-
+  const user = demoUser
   if (!user) {
     res.status(401).json({ error: 'INVALID_CREDENTIALS' })
     return
