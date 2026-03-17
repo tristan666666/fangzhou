@@ -490,7 +490,6 @@ function App() {
   )
   const funnel = useMemo(() => buildFunnel(leads), [leads])
   const timeline = useMemo(() => buildTaskTimeline(currentTask, taskDraft, funnel), [currentTask, taskDraft, funnel])
-  const taskTodos = useMemo(() => buildTaskTodo(selectedLead, funnel, taskReminders), [selectedLead, funnel, taskReminders])
 
   const searchedLeads = useMemo(() => {
     return leads.filter((lead) => {
@@ -513,6 +512,7 @@ function App() {
       null,
     [filteredLeads, leads, selectedLeadId],
   )
+  const taskTodos = useMemo(() => buildTaskTodo(selectedLead, funnel, taskReminders), [selectedLead, funnel, taskReminders])
 
   const inboxLeads = useMemo(() => {
     return leads
