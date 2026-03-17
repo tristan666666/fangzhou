@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: fangzhou-workbench-demo
+    runtime: node
+    plan: free
+    autoDeploy: true
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: 22

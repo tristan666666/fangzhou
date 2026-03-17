@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>方洲AI - ChatGPT 导出版</title>
+    <style>
+      :root {
+        font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        color: #142131;
+        background:
+          radial-gradient(circle at top left, rgba(74, 221, 193, 0.15), transparent 28%),
+          radial-gradient(circle at top right, rgba(242, 169, 88, 0.12), transparent 24%),
+          linear-gradient(180deg, #f5f1ea 0%, #efe9e1 100%);
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; padding: 18px; }
+      .shell { max-width: 1360px; margin: 0 auto; }
+      .bar, .panel, .card, .item {
+        background: rgba(255,255,255,0.84);
+        border: 1px solid rgba(20,33,49,0.1);
+        box-shadow: 0 18px 50px rgba(20,24,33,0.08);
+        border-radius: 22px;
+      }
+      .bar {
+        padding: 14px 18px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        padding: 10px 14px;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.92);
+        border: 1px solid rgba(20,33,49,0.1);
+        font-weight: 700;
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: 240px minmax(0,1fr) 320px;
+        gap: 12px;
+      }
+      .col { display: grid; gap: 12px; align-content: start; }
+      .panel { padding: 16px; }
+      .label {
+        margin: 0 0 10px;
+        font-size: 12px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #2f9d83;
+      }
+      .list { display: grid; gap: 10px; }
+      .card, .item { padding: 12px; }
+      .task-card {
+        background: rgba(255,253,249,0.96);
+      }
+      .task-card.active {
+        border-color: rgba(47,157,131,0.28);
+        background: linear-gradient(145deg, rgba(74,221,193,0.12), rgba(242,169,88,0.12));
+      }
+      .muted { color: rgba(20,33,49,0.68); }
+      .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0,1fr));
+        gap: 12px;
+      }
+      .metric strong, .item strong { font-size: 28px; display: block; margin-top: 4px; }
+      .tabs, .funnel {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .pill {
+        padding: 10px 14px;
+        border-radius: 999px;
+        border: 1px solid rgba(20,33,49,0.1);
+        background: rgba(255,253,249,0.96);
+      }
+      .pill.active {
+        background: #101924;
+        color: white;
+      }
+      .grid2 {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0,1fr));
+        gap: 12px;
+      }
+      .field { display: grid; gap: 6px; margin-bottom: 12px; }
+      .input {
+        border: 1px solid rgba(20,33,49,0.1);
+        border-radius: 14px;
+        background: #fff;
+        padding: 12px 14px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: rgba(255,253,249,0.96);
+        border-radius: 18px;
+        overflow: hidden;
+      }
+      th, td {
+        text-align: left;
+        padding: 12px 10px;
+        border-bottom: 1px solid rgba(20,33,49,0.08);
+      }
+      .thread, .suggestions {
+        display: grid;
+        gap: 10px;
+      }
+      .msg {
+        padding: 12px;
+        border-radius: 16px;
+      }
+      .creator { background: rgba(255,241,229,0.92); }
+      .system { background: rgba(246,244,238,0.92); }
+      .agent { background: rgba(233,248,244,0.92); }
+      @media (max-width: 1180px) {
+        .layout, .metric-grid, .grid2 { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <div class="bar">
+        <div>
+          <span class="brand">方洲AI</span>
+          <span class="muted">红人BD操作台</span>
+        </div>
+        <div class="muted">这是给 ChatGPT 看的静态导出版，不依赖 localhost</div>
+      </div>
+
+      <div class="layout">
+        <div class="col">
+          <div class="panel">
+            <p class="label">任务列表</p>
+            <div class="list">
+              <div class="task-card active card">
+                <strong>US / 50人触达</strong>
+                <div class="muted">5k - 100k 粉</div>
+                <div class="muted">已完成交付</div>
+              </div>
+              <div class="task-card card">
+                <strong>US / 10人回复推进</strong>
+                <div class="muted">中腰部红人</div>
+                <div class="muted">执行中</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <p class="label">线索池</p>
+            <div class="list">
+              <div class="item"><span class="muted">当前任务市场</span><strong>US</strong></div>
+              <div class="item"><span class="muted">当前垂类</span><strong>健身</strong></div>
+              <div class="item"><span class="muted">目标触达</span><strong>50</strong></div>
+              <div class="item"><span class="muted">佣金底线</span><strong>14%</strong></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <p class="label">会话收件箱</p>
+            <div class="list">
+              <div class="item"><strong>Mia Moves</strong><div class="muted">已回复</div></div>
+              <div class="item"><strong>Coach Lena</strong><div class="muted">洽谈中</div></div>
+              <div class="item"><strong>Wellness Weekly</strong><div class="muted">待人工接管</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col">
+          <div class="metric-grid">
+            <div class="panel metric">
+              <span class="muted">当前任务</span>
+              <strong>US / 50人触达</strong>
+              <div class="muted">美国市场，健身类，TikTok/Instagram 红人</div>
+            </div>
+            <div class="panel metric">
+              <span class="muted">数据源 / 通道</span>
+              <strong>2 / 2</strong>
+              <div class="muted">TikTok / Instagram ｜ Gmail / Instagram DM</div>
+            </div>
+            <div class="panel metric">
+              <span class="muted">预算和底线</span>
+              <strong>佣金 ≤ 14%</strong>
+              <div class="muted">目标本周触达 50 人</div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <p class="label">页面结构</p>
+            <div class="tabs">
+              <div class="pill active">创建任务</div>
+              <div class="pill">任务执行</div>
+              <div class="pill">会话处理</div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <p class="label">创建任务页</p>
+            <div class="grid2">
+              <div class="card">
+                <div class="field"><span class="muted">市场</span><div class="input">US</div></div>
+                <div class="field"><span class="muted">垂类</span><div class="input">健身</div></div>
+                <div class="field"><span class="muted">达人要求</span><div class="input">5k - 100k</div></div>
+                <div class="field"><span class="muted">合作方式</span><div class="input">寄样 + 佣金</div></div>
+              </div>
+              <div class="card">
+                <div class="field"><span class="muted">数据源状态</span><div class="input">TikTok：可抓取 / Instagram：可抓取</div></div>
+                <div class="field"><span class="muted">通道状态</span><div class="input">Gmail：可发送 / Instagram DM：可发送</div></div>
+                <div class="field"><span class="muted">任务动作</span><div class="input">创建任务 / 开始执行</div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <p class="label">任务执行页</p>
+            <div class="funnel">
+              <div class="pill active">全部 6</div>
+              <div class="pill">已抓取 1</div>
+              <div class="pill">初筛通过 1</div>
+              <div class="pill">已触达 1</div>
+              <div class="pill">已回复 1</div>
+              <div class="pill">洽谈中 1</div>
+              <div class="pill">待人工接管 1</div>
+            </div>
+            <div style="margin-top:12px">
+              <table>
+                <thead>
+                  <tr>
+                    <th>名称</th>
+                    <th>平台</th>
+                    <th>粉丝量</th>
+                    <th>匹配度</th>
+                    <th>联系方式</th>
+                    <th>当前状态</th>
+                    <th>处理模式</th>
+                    <th>最近动作</th>
+                    <th>下一步动作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr><td>Mia Moves</td><td>TikTok</td><td>12.4万</td><td>92</td><td>邮箱</td><td>已回复</td><td>AI辅助回复</td><td>回了报价</td><td>给 3 个回复版本</td></tr>
+                  <tr><td>Coach Lena</td><td>Instagram</td><td>31万</td><td>89</td><td>Instagram DM</td><td>洽谈中</td><td>人工接管</td><td>已问排期</td><td>你亲自跟进</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="panel">
+            <p class="label">会话处理页</p>
+            <div class="grid2">
+              <div class="thread">
+                <div class="msg system"><strong>系统</strong><div>任务底线：佣金 ≤ 14%</div></div>
+                <div class="msg creator"><strong>对方</strong><div>I can do it for $250 + gifted product.</div></div>
+              </div>
+              <div class="suggestions">
+                <div class="reply-card"><strong>压价版</strong><p>说明当前佣金底线，建议先做一轮轻量测试。</p></div>
+                <div class="reply-card"><strong>换纯佣版</strong><p>无法给固定费时，切换成更强的佣金合作结构。</p></div>
+                <div class="reply-card"><strong>继续聊版</strong><p>先发 brief 和 deliverable outline，再继续往下推进。</p></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col">
+          <div class="panel">
+            <p class="label">任务草案</p>
+            <div class="list">
+              <div class="item"><strong>目标</strong><div class="muted">US 市场 / 健身类 / 本周触达 50 人</div></div>
+              <div class="item"><strong>平台</strong><div class="muted">TikTok / Instagram</div></div>
+              <div class="item"><strong>渠道</strong><div class="muted">Gmail / Instagram DM</div></div>
+              <div class="item"><strong>预算和底线</strong><div class="muted">佣金 <= 14%</div></div>
+              <div class="item"><strong>AI 执行判断</strong><div class="muted">预估候选池 120，预计自动触达 38，AI辅助回复 10，人工接管 2</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

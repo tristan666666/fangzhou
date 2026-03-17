@@ -1,0 +1,1300 @@
+import 'dotenv/config'
+import crypto from 'node:crypto'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import express from 'express'
+import { supabase, supabaseEnabled, supabaseAuthEnabled, supabasePublic } from './supabase.js'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const rootDir = path.resolve(__dirname, '..')
+const clientDistDir = path.join(rootDir, 'dist', 'client')
+const PORT = Number(process.env.PORT || 8787)
+
+const TASK_STATUS = {
+  packaged: '已生成交付包',
+  externalRunning: '执行中',
+  waitingRefill: '待回填结果',
+  completed: '已完成交付',
+}
+
+const users = [
+  {
+    id: 'user-demo-1',
+    username: 'demo@fangzhou.ai',
+    password: 'demo123',
+    name: 'Demo Operator',
+  },
+]
+
+const demoBrands = [
+  {
+    id: 'brand-demo-1',
+    name: '方洲AI Demo Brand',
+    overview: '第一阶段只聚焦流量获取，用更少的人完成更高效的红人增长交付。',
+  },
+  {
+    id: 'brand-demo-2',
+    name: 'North Star Beauty',
+    overview: '以红人拓展和建联推进为主的跨境品牌增长工作空间。',
+  },
+]
+
+const modules = [
+  {
+    id: 'traffic-acquisition',
+    name: '流量获取',
+    status: '当前主打',
+    locked: false,
+    description: '围绕红人BD、Deal站、媒体PR和渠道拓展，先做最容易卖、最容易验证的增长模块。',
+    quickTasks: [
+      '为品牌输出本周 50 个 TikTok 红人名单',
+      '为 10 个中腰部红人生成首轮建联话术',
+      '整理本周可推进的 Deal 站和媒体名单',
+    ],
+  },
+  {
+    id: 'content-social',
+    name: '内容与社媒',
+    status: '第二阶段',
+    locked: true,
+    description: '社媒运营、内容发布、评论互动和社媒监控，暂不作为第一阶段主打。',
+    quickTasks: [],
+  },
+  {
+    id: 'conversion-scale',
+    name: '转化与放大',
+    status: '第三阶段',
+    locked: true,
+    description: '联盟营销、红人复投、ROI 分析和效果放大，后续作为第二层业务扩展。',
+    quickTasks: [],
+  },
+]
+
+const boardMetrics = {
+  'brand-demo-1': {
+    influencerPool: 286,
+    outreachInProgress: 34,
+    warmLeads: 11,
+    dealSitePool: 23,
+    mediaPool: 18,
+  },
+  'brand-demo-2': {
+    influencerPool: 132,
+    outreachInProgress: 17,
+    warmLeads: 6,
+    dealSitePool: 12,
+    mediaPool: 7,
+  },
+}
+
+const userTokens = new Map()
+const memoryTasks = []
+const memoryLeads = []
+const memoryMessages = []
+let bootstrapped = false
+
+function nowIso() {
+  return new Date().toISOString()
+}
+
+function createId(prefix) {
+  return `${prefix}_${crypto.randomUUID().slice(0, 8)}`
+}
+
+function moduleById(moduleId) {
+  return modules.find((item) => item.id === moduleId) || modules[0]
+}
+
+function appendLogs(task, messages) {
+  task.logs.push(
+    ...messages.map((message) => ({
+      at: nowIso(),
+      level: 'info',
+      message,
+    })),
+  )
+}
+
+function detectServiceTrack(instruction) {
+  const text = instruction.toLowerCase()
+
+  if (/pr|媒体|记者|magazine|press/.test(text)) {
+    return {
+      name: '人工BD',
+      description: '高价值资源保留人工推进，由你亲自谈判。',
+      deliverables: ['资源名单', '切入理由', '沟通策略', '优先级建议'],
+      targets: ['媒体名单', '历史报道', '品牌卖点', '联系人线索'],
+    }
+  }
+
+  if (/中腰|话术|跟进|合作|reply|dm|邮件/.test(text)) {
+    return {
+      name: '辅助BD',
+      description: '中腰部红人由 AI 辅助拆解与生成建联话术。',
+      deliverables: ['分层名单', '首轮话术', '跟进节奏', '风险提醒'],
+      targets: ['TikTok', 'Instagram', '达人主页', '历史合作记录'],
+    }
+  }
+
+  return {
+    name: '自动BD',
+    description: '适合标准化抓取与批量推进的小红人、Deal 站和基础名单任务。',
+    deliverables: ['候选名单', '基础筛选', '优先级排序', '可批量建联清单'],
+    targets: ['TikTok', 'Instagram', 'YouTube', 'Deal 站'],
+  }
+}
+
+function parseRefillResult(rawText) {
+  const lines = rawText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  const evidence = lines.filter((line) => line.startsWith('-') || line.startsWith('•')).slice(0, 6)
+  const summaryLines = lines.slice(0, 4)
+  const suggestedActions = lines.filter((line) => /建议|下一步|跟进|动作/i.test(line)).slice(0, 4)
+
+  return {
+    rawText,
+    summary: summaryLines.join(' ') || '已收到回填结果，建议人工确认后进入下一轮 BD 推进。',
+    evidence:
+      evidence.length > 0
+        ? evidence
+        : ['已收到结果，但当前未识别出标准化名单或证据，请人工补充。'],
+    nextActions:
+      suggestedActions.length > 0 ? suggestedActions : ['人工复核回填结果，并拆分下一步推进任务。'],
+    receivedAt: nowIso(),
+  }
+}
+
+function publicTask(task) {
+  return {
+    id: task.id,
+    brandId: task.brandId,
+    userId: task.userId,
+    moduleId: task.moduleId,
+    type: task.type,
+    instruction: task.instruction,
+    status: task.status,
+    createdAt: task.createdAt,
+    submittedAt: task.submittedAt,
+    completedAt: task.completedAt,
+    structuredTask: task.structuredTask,
+    executionPackage: task.executionPackage,
+    refill: task.refill,
+    logs: task.logs,
+  }
+}
+
+function mapBrandRow(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    overview: row.overview || '',
+  }
+}
+
+function mapTaskRow(row) {
+  return {
+    id: row.id,
+    brandId: row.brand_id,
+    userId: row.user_id,
+    moduleId: row.module_id,
+    type: row.type,
+    instruction: row.instruction,
+    status: row.status,
+    createdAt: row.created_at,
+    submittedAt: row.submitted_at,
+    completedAt: row.completed_at,
+    structuredTask: row.structured_task || {},
+    executionPackage: row.execution_package || {},
+    refill: row.refill || null,
+    logs: Array.isArray(row.logs) ? row.logs : [],
+  }
+}
+
+function mapLeadRow(row) {
+  return {
+    id: row.id,
+    taskId: row.task_id,
+    brandId: row.brand_id,
+    name: row.name,
+    platform: row.platform,
+    followers: row.followers,
+    fitScore: row.fit_score,
+    contact: row.contact,
+    status: row.status,
+    handling: row.handling,
+    lastAction: row.last_action,
+    nextAction: row.next_action,
+    intent: row.intent,
+    risk: row.risk,
+    notes: row.notes,
+    reminderAt: row.reminder_at,
+    reminderNote: row.reminder_note || '',
+    createdAt: row.created_at,
+  }
+}
+
+function mapMessageRow(row) {
+  return {
+    id: row.id,
+    leadId: row.lead_id,
+    taskId: row.task_id,
+    role: row.role,
+    text: row.text,
+    createdAt: row.created_at,
+  }
+}
+
+function taskToRow(task) {
+  return {
+    id: task.id,
+    brand_id: task.brandId,
+    user_id: task.userId,
+    module_id: task.moduleId,
+    type: task.type,
+    instruction: task.instruction,
+    status: task.status,
+    created_at: task.createdAt,
+    submitted_at: task.submittedAt,
+    completed_at: task.completedAt,
+    structured_task: task.structuredTask,
+    execution_package: task.executionPackage,
+    refill: task.refill,
+    logs: task.logs,
+  }
+}
+
+function leadToRow(lead) {
+  return {
+    id: lead.id,
+    task_id: lead.taskId,
+    brand_id: lead.brandId,
+    name: lead.name,
+    platform: lead.platform,
+    followers: lead.followers,
+    fit_score: lead.fitScore,
+    contact: lead.contact,
+    status: lead.status,
+    handling: lead.handling,
+    last_action: lead.lastAction,
+    next_action: lead.nextAction,
+    intent: lead.intent,
+    risk: lead.risk,
+    notes: lead.notes,
+    reminder_at: lead.reminderAt,
+    reminder_note: lead.reminderNote || '',
+    created_at: lead.createdAt,
+  }
+}
+
+function messageToRow(message) {
+  return {
+    id: message.id,
+    lead_id: message.leadId,
+    task_id: message.taskId,
+    role: message.role,
+    text: message.text,
+    created_at: message.createdAt,
+  }
+}
+
+function getDemoUserByToken(req) {
+  const auth = req.headers.authorization || ''
+  const token = auth.replace(/^Bearer\s+/i, '')
+  const userId = userTokens.get(token)
+  return users.find((item) => item.id === userId) || null
+}
+
+async function resolveAuthUser(req) {
+  const demoUser = getDemoUserByToken(req)
+  if (demoUser) return { ...demoUser, authMode: 'demo' }
+
+  if (!supabaseAuthEnabled) return null
+
+  const auth = req.headers.authorization || ''
+  const token = auth.replace(/^Bearer\s+/i, '')
+  if (!token) return null
+
+  const { data, error } = await supabase.auth.getUser(token)
+  if (error || !data.user) return null
+
+  return {
+    id: data.user.id,
+    username: data.user.email || '',
+    name: data.user.user_metadata?.name || data.user.email || 'Supabase User',
+    authMode: 'supabase',
+  }
+}
+
+async function requireUser(req, res, next) {
+  const user = await resolveAuthUser(req)
+  if (!user) {
+    res.status(401).json({ error: 'UNAUTHORIZED' })
+    return
+  }
+
+  req.user = user
+  next()
+}
+
+function createStructuredTask({ brandId, userId, moduleId, instruction, brands }) {
+  const module = moduleById(moduleId)
+  const brand = brands.find((item) => item.id === brandId)
+  const serviceTrack = detectServiceTrack(instruction)
+  const taskId = createId('task')
+
+  const structuredTask = {
+    objective: instruction.trim(),
+    moduleId,
+    moduleName: module.name,
+    serviceTrack: serviceTrack.name,
+    trackDescription: serviceTrack.description,
+    targets: serviceTrack.targets,
+    deliverables: serviceTrack.deliverables,
+    steps: [
+      `确认品牌目标与本周交付方向：${brand?.name || '当前品牌'}`,
+      `判断任务属于 ${serviceTrack.name}，并确认抓取来源：${serviceTrack.targets.join(' / ')}`,
+      '生成适合外部 Agent 使用的执行包，便于快速完成搜集与初步整理',
+      '结果回填后自动生成交付摘要、后续推进动作和历史记录',
+    ],
+  }
+
+  const packageContent = [
+    '# 方洲AI红人增长执行方案',
+    '',
+    `品牌：${brand?.name || '-'}`,
+    `业务模块：${module.name}`,
+    `BD层级：${serviceTrack.name}`,
+    `任务目标：${instruction.trim()}`,
+    '',
+    '## 你现在要完成的工作',
+    '请你作为具备浏览器访问能力的外部执行 Agent，围绕本任务完成名单搜集、初步筛选和结构化整理。',
+    '',
+    '## 重点来源',
+    ...serviceTrack.targets.map((item, index) => `${index + 1}. ${item}`),
+    '',
+    '## 需要交付的内容',
+    ...serviceTrack.deliverables.map((item, index) => `${index + 1}. ${item}`),
+    '',
+    '## 回填格式',
+    '### 执行摘要',
+    '- 用 3-5 条概括本次 BD 产出',
+    '',
+    '### 名单 / 证据',
+    '- 给出达人名称、平台、链接、粉丝量、匹配理由或资源说明',
+    '',
+    '### 建议后续动作',
+    '- 输出下一步应推进的 3 条动作',
+  ].join('\n')
+
+  return {
+    id: taskId,
+    brandId,
+    userId,
+    moduleId,
+    type: module.name,
+    instruction: instruction.trim(),
+    status: TASK_STATUS.packaged,
+    createdAt: nowIso(),
+    submittedAt: null,
+    completedAt: null,
+    structuredTask,
+    executionPackage: {
+      title: `${module.name} · ${serviceTrack.name}执行方案`,
+      content: packageContent,
+      exportName: `${taskId}.txt`,
+      externalStatus: '未提交',
+    },
+    refill: null,
+    logs: [
+      {
+        at: nowIso(),
+        level: 'info',
+        message: `任务已完成结构化，当前归类到 ${serviceTrack.name}。`,
+      },
+    ],
+  }
+}
+
+function createDemoLeadSet(task) {
+  const rows = [
+    {
+      name: 'Mia Moves',
+      platform: 'TikTok',
+      followers: '12.4万',
+      fitScore: 92,
+      contact: 'Gmail',
+      status: '已回复',
+      handling: 'AI辅助回复',
+      lastAction: '达人报 $250 + 寄样',
+      nextAction: '给 3 个回复版本',
+      intent: '有兴趣，但报价超约束',
+      risk: '固定费超出当前合作约束',
+      notes: '内容风格贴近居家健身，评论区互动质量高。',
+      reminderAt: null,
+      reminderNote: '',
+      messages: [
+        { role: 'system', text: '当前合作约束：佣金上限 14%；可寄样；不接受固定费；排除竞品达人' },
+        { role: 'agent', text: 'Hi Mia, we are exploring a sample + commission collaboration for the US fitness audience.' },
+        { role: 'creator', text: 'I can do it for $250 + gifted product.' },
+      ],
+    },
+    {
+      name: 'Coach Lena',
+      platform: 'Instagram',
+      followers: '31万',
+      fitScore: 89,
+      contact: 'Instagram DM',
+      status: '洽谈中',
+      handling: '人工接管',
+      lastAction: '对方询问排期和历史案例',
+      nextAction: '补品牌资料并人工跟进',
+      intent: '高价值候选，需要深聊',
+      risk: '涉及排期、案例和 exclusivity',
+      notes: '账号内容质量高，适合品牌形象合作。',
+      reminderAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      reminderNote: '明天补品牌资料并继续推进',
+      messages: [
+        { role: 'system', text: '高价值对象，建议人工接管。' },
+        { role: 'creator', text: 'Can you share more details about timing, expected deliverables, and previous campaigns?' },
+      ],
+    },
+    {
+      name: 'HomeGym Abby',
+      platform: 'TikTok',
+      followers: '6.8万',
+      fitScore: 87,
+      contact: 'Gmail',
+      status: '已触达',
+      handling: '自动触达',
+      lastAction: '首轮消息已发',
+      nextAction: '等待 48 小时后自动二跟',
+      intent: '等待回复',
+      risk: '暂无',
+      notes: '适合标准化首轮触达。',
+      reminderAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+      reminderNote: '48 小时后检查是否需要二次触达',
+      messages: [{ role: 'system', text: '已发送首轮触达，暂时无需人工介入。' }],
+    },
+    {
+      name: 'Fit Deals Hub',
+      platform: 'Deal站',
+      followers: '站点',
+      fitScore: 81,
+      contact: 'Gmail',
+      status: '初筛通过',
+      handling: '自动触达',
+      lastAction: '已进入候选池',
+      nextAction: '等待批量发送',
+      intent: '可批量推进',
+      risk: '需确认站点受众匹配',
+      notes: 'Deal 站资源，适合低成本引流测试。',
+      reminderAt: null,
+      reminderNote: '',
+      messages: [{ role: 'system', text: '已通过初筛，等待首轮建联。' }],
+    },
+    {
+      name: 'Lift With Nora',
+      platform: 'Instagram',
+      followers: '8.2万',
+      fitScore: 84,
+      contact: 'Instagram DM',
+      status: '已抓取',
+      handling: '自动触达',
+      lastAction: '抓取到主页与邮箱',
+      nextAction: '判断内容风格是否入池',
+      intent: '待初筛',
+      risk: '暂无',
+      notes: '主页风格偏女性力量训练，待确认是否匹配产品受众。',
+      reminderAt: null,
+      reminderNote: '',
+      messages: [{ role: 'system', text: '刚进入候选池，还没有会话。' }],
+    },
+    {
+      name: 'Wellness Weekly',
+      platform: '媒体 PR',
+      followers: '媒体',
+      fitScore: 76,
+      contact: 'Gmail',
+      status: '待人工接管',
+      handling: '人工接管',
+      lastAction: '对方要求品牌背景与媒体包',
+      nextAction: '准备品牌资料后再回',
+      intent: '需提供更完整品牌信息',
+      risk: '信息不完整会影响推进',
+      notes: '媒体方问得比较细，不适合自动回复。',
+      reminderAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      reminderNote: '补品牌背景与 KPI 资料',
+      messages: [{ role: 'creator', text: 'Please send over your brand background, KPIs, and campaign examples.' }],
+    },
+    {
+      name: 'PowerCore Jay',
+      platform: 'YouTube',
+      followers: '22万',
+      fitScore: 83,
+      contact: 'Gmail',
+      status: '已确认合作',
+      handling: '人工接管',
+      lastAction: '已确认寄样 + 佣金',
+      nextAction: '移交履约',
+      intent: '已达成合作',
+      risk: '需跟踪发样和发布时间',
+      notes: '可作为本任务示范案例。',
+      reminderAt: null,
+      reminderNote: '',
+      messages: [{ role: 'creator', text: 'Sounds good. I am happy with gifted product + commission. Let us move ahead.' }],
+    },
+  ]
+
+  const leads = rows.map((item, index) => ({
+    id: `${task.id}-lead-${index + 1}`,
+    taskId: task.id,
+    brandId: task.brandId,
+    name: item.name,
+    platform: item.platform,
+    followers: item.followers,
+    fitScore: item.fitScore,
+    contact: item.contact,
+    status: item.status,
+    handling: item.handling,
+    lastAction: item.lastAction,
+    nextAction: item.nextAction,
+    intent: item.intent,
+    risk: item.risk,
+    notes: item.notes,
+    reminderAt: item.reminderAt,
+    reminderNote: item.reminderNote,
+    createdAt: task.createdAt,
+  }))
+
+  const messages = leads.flatMap((lead, leadIndex) =>
+    rows[leadIndex].messages.map((message, messageIndex) => ({
+      id: `${lead.id}-msg-${messageIndex + 1}`,
+      leadId: lead.id,
+      taskId: task.id,
+      role: message.role,
+      text: message.text,
+      createdAt: task.createdAt,
+    })),
+  )
+
+  return { leads, messages }
+}
+
+async function getBrands() {
+  if (!supabaseEnabled) return demoBrands
+
+  const { data, error } = await supabase.from('brands').select('id,name,overview').order('created_at', { ascending: true })
+  if (error) throw error
+  return data.map(mapBrandRow)
+}
+
+async function listTasks(userId, brandId) {
+  if (!supabaseEnabled) {
+    return memoryTasks
+      .filter((item) => item.userId === userId && item.brandId === brandId)
+      .slice()
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+  }
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('brand_id', brandId)
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return data.map(mapTaskRow)
+}
+
+async function listLeadsByTask(taskId) {
+  if (!supabaseEnabled) {
+    return memoryLeads.filter((item) => item.taskId === taskId)
+  }
+
+  const { data, error } = await supabase.from('leads').select('*').eq('task_id', taskId).order('created_at', { ascending: true })
+  if (error) throw error
+  return data.map(mapLeadRow)
+}
+
+async function listMessagesByTask(taskId) {
+  if (!supabaseEnabled) {
+    return memoryMessages.filter((item) => item.taskId === taskId)
+  }
+
+  const { data, error } = await supabase.from('messages').select('*').eq('task_id', taskId).order('created_at', { ascending: true })
+  if (error) throw error
+  return data.map(mapMessageRow)
+}
+
+async function getTaskById(taskId, userId) {
+  if (!supabaseEnabled) {
+    return memoryTasks.find((item) => item.id === taskId && item.userId === userId) || null
+  }
+
+  const { data, error } = await supabase.from('tasks').select('*').eq('id', taskId).eq('user_id', userId).maybeSingle()
+  if (error) throw error
+  return data ? mapTaskRow(data) : null
+}
+
+async function getLeadById(leadId) {
+  if (!supabaseEnabled) {
+    return memoryLeads.find((item) => item.id === leadId) || null
+  }
+
+  const { data, error } = await supabase.from('leads').select('*').eq('id', leadId).maybeSingle()
+  if (error) throw error
+  return data ? mapLeadRow(data) : null
+}
+
+async function saveTask(task) {
+  if (!supabaseEnabled) {
+    const index = memoryTasks.findIndex((item) => item.id === task.id)
+    if (index >= 0) memoryTasks[index] = task
+    else memoryTasks.unshift(task)
+    return task
+  }
+
+  const { data, error } = await supabase.from('tasks').upsert(taskToRow(task)).select('*').single()
+  if (error) throw error
+  return mapTaskRow(data)
+}
+
+async function saveLead(lead) {
+  if (!supabaseEnabled) {
+    const index = memoryLeads.findIndex((item) => item.id === lead.id)
+    if (index >= 0) memoryLeads[index] = lead
+    else memoryLeads.push(lead)
+    return lead
+  }
+
+  const { data, error } = await supabase.from('leads').upsert(leadToRow(lead)).select('*').single()
+  if (error) throw error
+  return mapLeadRow(data)
+}
+
+async function saveMessage(message) {
+  if (!supabaseEnabled) {
+    const index = memoryMessages.findIndex((item) => item.id === message.id)
+    if (index >= 0) memoryMessages[index] = message
+    else memoryMessages.push(message)
+    return message
+  }
+
+  const { data, error } = await supabase.from('messages').insert(messageToRow(message)).select('*').single()
+  if (error) throw error
+  return mapMessageRow(data)
+}
+
+async function saveLeadSet(leads, messages) {
+  if (!supabaseEnabled) {
+    leads.forEach((lead) => {
+      const index = memoryLeads.findIndex((item) => item.id === lead.id)
+      if (index >= 0) memoryLeads[index] = lead
+      else memoryLeads.push(lead)
+    })
+
+    messages.forEach((message) => {
+      const index = memoryMessages.findIndex((item) => item.id === message.id)
+      if (index >= 0) memoryMessages[index] = message
+      else memoryMessages.push(message)
+    })
+    return
+  }
+
+  const { error: leadError } = await supabase.from('leads').upsert(leads.map(leadToRow))
+  if (leadError) throw leadError
+
+  const { error: messageError } = await supabase.from('messages').upsert(messages.map(messageToRow))
+  if (messageError) throw messageError
+}
+
+async function seedDemoData() {
+  if (bootstrapped) return
+
+  const baseTaskPayloads = [
+    {
+      instruction: '任务名称：美国健身达人首轮触达\n产品：筋膜枪 SKU-01\n市场：美国\n行业方向：健身\n目标平台：TikTok / Instagram\n触达方式：Gmail / Instagram DM\n达人范围：5k - 100k\n合作方式：寄样 + 佣金\n合作约束：佣金上限 14%；可寄样；不接受固定费；排除竞品达人\n目标触达：50 位达人',
+      completed: true,
+    },
+    {
+      instruction: '任务名称：中腰部红人首轮话术\n产品：筋膜枪 SKU-01\n市场：美国\n行业方向：健身\n目标平台：TikTok / Instagram\n触达方式：Gmail / Instagram DM\n达人范围：50k - 300k\n合作方式：寄样 + 佣金\n合作约束：佣金上限 14%；可寄样；不接受固定费；排除竞品达人\n目标触达：10 位达人',
+      completed: false,
+    },
+  ]
+
+  if (!supabaseEnabled) {
+    if (memoryTasks.length === 0) {
+      const brands = demoBrands
+      for (const payload of baseTaskPayloads) {
+        const task = createStructuredTask({
+          brandId: 'brand-demo-1',
+          userId: 'user-demo-1',
+          moduleId: 'traffic-acquisition',
+          instruction: payload.instruction,
+          brands,
+        })
+
+        if (payload.completed) {
+          task.status = TASK_STATUS.completed
+          task.submittedAt = nowIso()
+          task.completedAt = nowIso()
+          task.executionPackage.externalStatus = '已回填'
+          task.refill = parseRefillResult(`### 执行摘要
+- 已完成 50 个 TikTok 健身垂类红人的首轮搜集与基础筛选。
+- 其中 18 个账号与品牌调性高度匹配，可优先推进建联。
+- 名单中有 7 个账号近期与竞品有合作记录，需要调整切入方式。
+
+### 名单 / 证据
+- @fitbymia：TikTok，粉丝 12.4 万，互动稳定，适合做短期测款合作。
+- @coachlena：TikTok，粉丝 31 万，评论区女性用户占比高。
+- @gymdealhunter：Deal 站内容账号，适合导流活动合作。
+
+### 建议后续动作
+- 先推进前 10 个高匹配账号的首轮建联。
+- 将有竞品合作记录的达人单独列出，重新设计切入话术。
+- 再补一轮英国市场的女性健身达人名单。`)
+          appendLogs(task, ['首轮达人名单已完成回填。', '系统已生成本周优先推进建议。'])
+        } else {
+          appendLogs(task, ['等待提交给外部执行 Agent。'])
+        }
+
+        memoryTasks.push(task)
+        const { leads, messages } = createDemoLeadSet(task)
+        memoryLeads.push(...leads)
+        memoryMessages.push(...messages)
+      }
+    }
+
+    bootstrapped = true
+    return
+  }
+
+  const { error: brandError } = await supabase.from('brands').upsert(
+    demoBrands.map((brand) => ({
+      id: brand.id,
+      name: brand.name,
+      overview: brand.overview,
+    })),
+    { onConflict: 'id' },
+  )
+  if (brandError) throw brandError
+
+  const { count, error: countError } = await supabase
+    .from('tasks')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', 'user-demo-1')
+
+  if (countError) throw countError
+  if ((count || 0) > 0) {
+    bootstrapped = true
+    return
+  }
+
+  const brands = demoBrands
+  for (const payload of baseTaskPayloads) {
+    const task = createStructuredTask({
+      brandId: 'brand-demo-1',
+      userId: 'user-demo-1',
+      moduleId: 'traffic-acquisition',
+      instruction: payload.instruction,
+      brands,
+    })
+
+    if (payload.completed) {
+      task.status = TASK_STATUS.completed
+      task.submittedAt = nowIso()
+      task.completedAt = nowIso()
+      task.executionPackage.externalStatus = '已回填'
+      task.refill = parseRefillResult(`### 执行摘要
+- 已完成 50 个 TikTok 健身垂类红人的首轮搜集与基础筛选。
+- 其中 18 个账号与品牌调性高度匹配，可优先推进建联。
+- 名单中有 7 个账号近期与竞品有合作记录，需要调整切入方式。
+
+### 名单 / 证据
+- @fitbymia：TikTok，粉丝 12.4 万，互动稳定，适合做短期测款合作。
+- @coachlena：TikTok，粉丝 31 万，评论区女性用户占比高。
+- @gymdealhunter：Deal 站内容账号，适合导流活动合作。
+
+### 建议后续动作
+- 先推进前 10 个高匹配账号的首轮建联。
+- 将有竞品合作记录的达人单独列出，重新设计切入话术。
+- 再补一轮英国市场的女性健身达人名单。`)
+      appendLogs(task, ['首轮达人名单已完成回填。', '系统已生成本周优先推进建议。'])
+    } else {
+      appendLogs(task, ['等待提交给外部执行 Agent。'])
+    }
+
+    await saveTask(task)
+    const { leads, messages } = createDemoLeadSet(task)
+    await saveLeadSet(leads, messages)
+  }
+
+  bootstrapped = true
+}
+
+function groupMessagesByLead(messages) {
+  return messages.reduce((acc, message) => {
+    if (!acc[message.leadId]) acc[message.leadId] = []
+    acc[message.leadId].push({
+      id: message.id,
+      role: message.role,
+      text: message.text,
+      createdAt: message.createdAt,
+    })
+    return acc
+  }, {})
+}
+
+function attachConversations(leads, messages) {
+  const grouped = groupMessagesByLead(messages)
+  return leads.map((lead) => ({
+    ...lead,
+    conversation: grouped[lead.id] || [],
+  }))
+}
+
+async function buildDashboard(userId, brandId) {
+  const brandTasks = await listTasks(userId, brandId)
+  const base = boardMetrics[brandId] || boardMetrics['brand-demo-1']
+  const completedTasks = brandTasks.filter((item) => item.status === TASK_STATUS.completed)
+  const today = new Date().toDateString()
+  const todayTasks = brandTasks.filter((item) => new Date(item.createdAt).toDateString() === today)
+  const activeTask = brandTasks[0] || null
+  const leadsByTask = {}
+
+  await Promise.all(
+    brandTasks.map(async (task) => {
+      const [leads, messages] = await Promise.all([listLeadsByTask(task.id), listMessagesByTask(task.id)])
+      leadsByTask[task.id] = attachConversations(leads, messages)
+    }),
+  )
+
+  const reminderLeads = Object.values(leadsByTask)
+    .flat()
+    .filter((lead) => lead.reminderAt)
+    .sort((left, right) => String(left.reminderAt).localeCompare(String(right.reminderAt)))
+    .slice(0, 8)
+
+  return {
+    brandId,
+    overview: {
+      tagline: 'AI驱动的跨境红人增长服务',
+      weeklyCreatorGoal: 100,
+      outreachInProgress: base.outreachInProgress,
+      warmLeads: base.warmLeads,
+      todayTaskCount: todayTasks.length,
+      recentResultCount: completedTasks.length,
+      pendingRefillCount: brandTasks.filter((item) => item.status === TASK_STATUS.waitingRefill).length,
+      reminderCount: reminderLeads.length,
+    },
+    dataCenter: {
+      influencerPool: base.influencerPool,
+      dealSitePool: base.dealSitePool,
+      mediaPool: base.mediaPool,
+      activeOutreach: base.outreachInProgress,
+      historyTaskCount: brandTasks.length,
+    },
+    recentResults: completedTasks.slice(0, 3).map((item) => ({
+      id: item.id,
+      instruction: item.instruction,
+      summary: item.refill?.summary || '',
+      completedAt: item.completedAt,
+    })),
+    reminders: reminderLeads,
+    tasks: brandTasks.map(publicTask),
+    activeTaskId: activeTask?.id || null,
+    leadsByTask,
+  }
+}
+
+const app = express()
+app.use(express.json({ limit: '10mb' }))
+app.use(express.urlencoded({ extended: true }))
+
+app.get('/healthz', (_req, res) => {
+  res.json({
+    ok: true,
+    storage: supabaseEnabled ? 'supabase' : 'memory',
+    uptime: process.uptime(),
+    now: nowIso(),
+  })
+})
+
+app.get('/api/bootstrap', async (_req, res) => {
+  await seedDemoData()
+  const brands = await getBrands()
+
+  res.json({
+    brands,
+    modules,
+    storageMode: supabaseEnabled ? 'supabase' : 'memory',
+    authMode: supabaseAuthEnabled ? 'supabase' : 'demo',
+    demoCredentials: {
+      username: 'demo@fangzhou.ai',
+      password: 'demo123',
+    },
+  })
+})
+
+app.post('/api/login', async (req, res) => {
+  await seedDemoData()
+  const { username, password } = req.body
+
+  if (supabaseAuthEnabled) {
+    const { data, error } = await supabasePublic.auth.signInWithPassword({
+      email: username,
+      password,
+    })
+
+    if (error || !data.session || !data.user) {
+      res.status(401).json({ error: 'INVALID_CREDENTIALS' })
+      return
+    }
+
+    res.json({
+      token: data.session.access_token,
+      user: {
+        id: data.user.id,
+        username: data.user.email || username,
+        name: data.user.user_metadata?.name || data.user.email || username,
+      },
+    })
+    return
+  }
+
+  const user = users.find((item) => item.username === username && item.password === password)
+
+  if (!user) {
+    res.status(401).json({ error: 'INVALID_CREDENTIALS' })
+    return
+  }
+
+  const token = crypto.randomUUID()
+  userTokens.set(token, user.id)
+  res.json({
+    token,
+    user: {
+      id: user.id,
+      username: user.username,
+      name: user.name,
+    },
+  })
+})
+
+app.post('/api/register', async (req, res) => {
+  await seedDemoData()
+
+  if (!supabaseAuthEnabled) {
+    res.status(400).json({ error: 'SUPABASE_AUTH_NOT_CONFIGURED' })
+    return
+  }
+
+  const { email, password, name } = req.body
+  if (!email?.trim() || !password?.trim()) {
+    res.status(400).json({ error: 'INVALID_REGISTER_PAYLOAD' })
+    return
+  }
+
+  const { data: created, error: createError } = await supabase.auth.admin.createUser({
+    email: email.trim(),
+    password: password.trim(),
+    email_confirm: true,
+    user_metadata: {
+      name: name?.trim() || email.trim(),
+    },
+  })
+
+  if (createError || !created.user) {
+    res.status(400).json({ error: createError?.message || 'REGISTER_FAILED' })
+    return
+  }
+
+  const { data: signedIn, error: loginError } = await supabasePublic.auth.signInWithPassword({
+    email: email.trim(),
+    password: password.trim(),
+  })
+
+  if (loginError || !signedIn.session || !signedIn.user) {
+    res.status(400).json({ error: loginError?.message || 'LOGIN_AFTER_REGISTER_FAILED' })
+    return
+  }
+
+  res.status(201).json({
+    token: signedIn.session.access_token,
+    user: {
+      id: signedIn.user.id,
+      username: signedIn.user.email || email.trim(),
+      name: signedIn.user.user_metadata?.name || name?.trim() || email.trim(),
+    },
+  })
+})
+
+app.get('/api/me', requireUser, async (req, res) => {
+  await seedDemoData()
+  const brands = await getBrands()
+  res.json({
+    user: {
+      id: req.user.id,
+      username: req.user.username,
+      name: req.user.name,
+      authMode: req.user.authMode,
+    },
+    brands,
+  })
+})
+
+app.get('/api/dashboard', requireUser, async (req, res) => {
+  await seedDemoData()
+  const brands = await getBrands()
+  const brandId = String(req.query.brandId || brands[0]?.id || '')
+  res.json(await buildDashboard(req.user.id, brandId))
+})
+
+app.post('/api/tasks', requireUser, async (req, res) => {
+  await seedDemoData()
+  const brands = await getBrands()
+  const { brandId, moduleId, instruction } = req.body
+  const brand = brands.find((item) => item.id === brandId)
+  const module = modules.find((item) => item.id === moduleId)
+
+  if (!brand || !module || module.locked || !instruction?.trim()) {
+    res.status(400).json({ error: 'INVALID_TASK_PAYLOAD' })
+    return
+  }
+
+  const task = createStructuredTask({
+    brandId,
+    userId: req.user.id,
+    moduleId,
+    instruction,
+    brands,
+  })
+
+  const savedTask = await saveTask(task)
+  const { leads, messages } = createDemoLeadSet(savedTask)
+  await saveLeadSet(leads, messages)
+
+  res.status(201).json({ task: publicTask(savedTask) })
+})
+
+app.post('/api/tasks/:id/submit', requireUser, async (req, res) => {
+  await seedDemoData()
+  const task = await getTaskById(req.params.id, req.user.id)
+
+  if (!task) {
+    res.status(404).json({ error: 'TASK_NOT_FOUND' })
+    return
+  }
+
+  task.status = TASK_STATUS.externalRunning
+  task.submittedAt = nowIso()
+  task.executionPackage.externalStatus = '已提交给外部执行 Agent'
+  appendLogs(task, ['执行方案已提交，等待结果回填。'])
+
+  const savedTask = await saveTask(task)
+  res.json({ task: publicTask(savedTask) })
+})
+
+app.post('/api/tasks/:id/mark-refill', requireUser, async (req, res) => {
+  await seedDemoData()
+  const task = await getTaskById(req.params.id, req.user.id)
+
+  if (!task) {
+    res.status(404).json({ error: 'TASK_NOT_FOUND' })
+    return
+  }
+
+  task.status = TASK_STATUS.waitingRefill
+  task.executionPackage.externalStatus = '等待回填结果'
+  appendLogs(task, ['已进入待回填状态。'])
+
+  const savedTask = await saveTask(task)
+  res.json({ task: publicTask(savedTask) })
+})
+
+app.post('/api/tasks/:id/refill', requireUser, async (req, res) => {
+  await seedDemoData()
+  const task = await getTaskById(req.params.id, req.user.id)
+
+  if (!task) {
+    res.status(404).json({ error: 'TASK_NOT_FOUND' })
+    return
+  }
+
+  const { rawText } = req.body
+  if (!rawText?.trim()) {
+    res.status(400).json({ error: 'INVALID_REFILL_PAYLOAD' })
+    return
+  }
+
+  task.refill = parseRefillResult(rawText.trim())
+  task.status = TASK_STATUS.completed
+  task.completedAt = nowIso()
+  task.executionPackage.externalStatus = '已完成回填'
+  appendLogs(task, ['已收到执行结果。', '系统已生成摘要与下一步推进建议。'])
+
+  const savedTask = await saveTask(task)
+  res.json({ task: publicTask(savedTask) })
+})
+
+app.post('/api/leads/:id/messages', requireUser, async (req, res) => {
+  await seedDemoData()
+  const lead = await getLeadById(req.params.id)
+
+  if (!lead) {
+    res.status(404).json({ error: 'LEAD_NOT_FOUND' })
+    return
+  }
+
+  const task = await getTaskById(lead.taskId, req.user.id)
+  if (!task) {
+    res.status(404).json({ error: 'TASK_NOT_FOUND' })
+    return
+  }
+
+  const { text } = req.body
+  if (!text?.trim()) {
+    res.status(400).json({ error: 'INVALID_MESSAGE_PAYLOAD' })
+    return
+  }
+
+  const message = await saveMessage({
+    id: createId('msg'),
+    leadId: lead.id,
+    taskId: lead.taskId,
+    role: 'agent',
+    text: text.trim(),
+    createdAt: nowIso(),
+  })
+
+  lead.lastAction = '已发送回复'
+  lead.nextAction = '等待对方回复'
+  if (lead.status === '已回复' || lead.status === '待人工接管') {
+    lead.status = '洽谈中'
+  }
+  await saveLead(lead)
+
+  appendLogs(task, [`已向 ${lead.name} 发送回复，当前状态进入 ${lead.status}。`])
+  await saveTask(task)
+
+  res.status(201).json({ message, lead })
+})
+
+app.patch('/api/leads/:id', requireUser, async (req, res) => {
+  await seedDemoData()
+  const lead = await getLeadById(req.params.id)
+
+  if (!lead) {
+    res.status(404).json({ error: 'LEAD_NOT_FOUND' })
+    return
+  }
+
+  const task = await getTaskById(lead.taskId, req.user.id)
+  if (!task) {
+    res.status(404).json({ error: 'TASK_NOT_FOUND' })
+    return
+  }
+
+  const { status, handling, nextAction, reminderAt, reminderNote } = req.body
+  const prevStatus = lead.status
+  const prevHandling = lead.handling
+  if (status) lead.status = status
+  if (handling) lead.handling = handling
+  if (nextAction) lead.nextAction = nextAction
+  if (reminderAt !== undefined) lead.reminderAt = reminderAt || null
+  if (reminderNote !== undefined) lead.reminderNote = reminderNote || ''
+  lead.lastAction = '已更新线索状态'
+
+  const savedLead = await saveLead(lead)
+  const logParts = [`已更新 ${lead.name}`]
+  if (status && prevStatus !== savedLead.status) logParts.push(`状态：${prevStatus} -> ${savedLead.status}`)
+  if (handling && prevHandling !== savedLead.handling) logParts.push(`处理方式：${prevHandling} -> ${savedLead.handling}`)
+  if (nextAction) logParts.push(`下一步：${savedLead.nextAction}`)
+  if (reminderAt) logParts.push(`提醒：${savedLead.reminderAt}`)
+  if (reminderAt === null || reminderAt === '') logParts.push('提醒已清除')
+  appendLogs(task, [logParts.join(' ｜ ')])
+  await saveTask(task)
+
+  res.json({ lead: savedLead })
+})
+
+app.post('/api/leads/bulk-update', requireUser, async (req, res) => {
+  await seedDemoData()
+  const { ids, status, handling, nextAction, reminderAt, reminderNote } = req.body
+
+  if (!Array.isArray(ids) || ids.length === 0) {
+    res.status(400).json({ error: 'INVALID_BULK_PAYLOAD' })
+    return
+  }
+
+  const touchedTasks = new Map()
+  const updatedLeads = []
+
+  for (const id of ids) {
+    const lead = await getLeadById(id)
+    if (!lead) continue
+
+    const task = await getTaskById(lead.taskId, req.user.id)
+    if (!task) continue
+
+    const prevStatus = lead.status
+    const prevHandling = lead.handling
+    if (status) lead.status = status
+    if (handling) lead.handling = handling
+    if (nextAction) lead.nextAction = nextAction
+    if (reminderAt !== undefined) lead.reminderAt = reminderAt || null
+    if (reminderNote !== undefined) lead.reminderNote = reminderNote || ''
+    lead.lastAction = '已批量更新线索'
+
+    const savedLead = await saveLead(lead)
+    updatedLeads.push(savedLead)
+
+    const taskLogs = touchedTasks.get(task.id) || { task, logs: [] }
+    const logParts = [`批量更新 ${lead.name}`]
+    if (status && prevStatus !== savedLead.status) logParts.push(`状态：${prevStatus} -> ${savedLead.status}`)
+    if (handling && prevHandling !== savedLead.handling) logParts.push(`处理方式：${prevHandling} -> ${savedLead.handling}`)
+    if (reminderAt) logParts.push(`提醒：${savedLead.reminderAt}`)
+    if (nextAction) logParts.push(`下一步：${savedLead.nextAction}`)
+    taskLogs.logs.push(logParts.join(' ｜ '))
+    touchedTasks.set(task.id, taskLogs)
+  }
+
+  for (const { task, logs } of touchedTasks.values()) {
+    appendLogs(task, logs)
+    await saveTask(task)
+  }
+
+  res.json({ updatedCount: updatedLeads.length, leads: updatedLeads })
+})
+
+app.use(express.static(clientDistDir))
+app.get(/.*/, (req, res, next) => {
+  if (req.path.startsWith('/api/')) {
+    next()
+    return
+  }
+
+  res.sendFile(path.join(clientDistDir, 'index.html'))
+})
+
+app.use((error, _req, res, _next) => {
+  console.error(error)
+  res.status(500).json({
+    error: 'SERVER_ERROR',
+    detail: error.message,
+  })
+})
+
+app.listen(PORT, async () => {
+  try {
+    await seedDemoData()
+    console.log(`Fangzhou workbench server running on http://localhost:${PORT}`)
+    console.log(`Storage mode: ${supabaseEnabled ? 'supabase' : 'memory'}`)
+  } catch (error) {
+    console.error('Bootstrap failed:', error.message)
+  }
+})
