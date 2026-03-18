@@ -9,8 +9,24 @@ const emptyDashboard = {
 
 const taskPageTabs = [
   { id: 'create', label: '创建任务' },
-  { id: 'execute', label: '任务执行' },
+  { id: 'execute', label: '执行台' },
   { id: 'conversation', label: '会话处理' },
+]
+
+const workspaceNavItems = [
+  { id: 'overview', label: '总览', target: 'execute' },
+  { id: 'tasks', label: '任务', target: 'create' },
+  { id: 'leads', label: '线索', target: 'execute' },
+  { id: 'conversations', label: '会话', target: 'conversation' },
+  { id: 'brand', label: '品牌资料', target: 'create' },
+  { id: 'settings', label: '设置', target: 'create' },
+]
+
+const quickPromptPresets = [
+  '帮我创建一个美国健身类 TikTok 达人首轮触达任务，目标 50 人，合作方式寄样 + 佣金，佣金不超过 14%。',
+  '创建一个 Deal 站新品冷启动任务，目标本周拿到 15 个可合作站点。',
+  '整理一批 YouTube 测评达人，优先找 10 万粉以下、可寄样的账号。',
+  '建立一个媒体 PR 建联任务，先筛 20 个适合筋膜枪品类的健康媒体。',
 ]
 
 const taskStatusFilters = ['全部', '草稿', '执行中', '待回复', '已完成']
@@ -435,6 +451,9 @@ function App() {
   const [loginForm, setLoginForm] = useState({ username: 'demo@fangzhou.ai', password: 'demo123' })
   const [registerForm, setRegisterForm] = useState({ name: '', email: '', password: '' })
   const [taskForm, setTaskForm] = useState(defaultForm)
+  const [taskPrompt, setTaskPrompt] = useState(
+    '帮我创建一个美国健身类 TikTok 达人首轮触达任务，目标 50 人，合作方式寄样 + 佣金，佣金不超过 14%。',
+  )
   const [replyDraft, setReplyDraft] = useState('')
   const [selectedLeadIds, setSelectedLeadIds] = useState([])
   const [bulkStatus, setBulkStatus] = useState('')
@@ -625,6 +644,7 @@ function App() {
     if (!token || !brandId) return
     setCreatingTask(true)
     try {
+      const instruction = taskPrompt.trim() || buildTaskInstruction(taskForm)
       const response = await apiFetch(
         '/api/tasks',
         {
@@ -632,7 +652,7 @@ function App() {
           body: JSON.stringify({
             brandId,
             moduleId: 'traffic-acquisition',
-            instruction: buildTaskInstruction(taskForm),
+            instruction,
           }),
         },
         token,
@@ -1029,22 +1049,66 @@ function App() {
 
       <div className="workspace-grid">
         <aside className="left-rail">
-          <section className="panel rail-panel">
-            <div className="rail-head">
-              <div>
-                <p className="section-label">任务列表</p>
-                <h3>{taskStatusSummary(normalizedTasks)}</h3>
+          <section className="panel rail-panel rail-sidebar">
+            <div className="sidebar-brand">
+              <div className="sidebar-brand-stack">
+                <span className="eyebrow">Workspace</span>
+                <strong>方洲AI</strong>
+                <button type="button" className="workspace-switch">
+                  {bootstrap.brands.find((brand) => brand.id === brandId)?.name || 'Demo Brand'} ▼
+                </button>
               </div>
+              <button type="button" className="collapse-button" aria-label="收起侧栏">
+                ≡
+              </button>
             </div>
 
+            <button
+              type="button"
+              className="primary-button sidebar-primary"
+              onClick={() => {
+                setPageId('create')
+                setCurrentTaskId('')
+              }}
+            >
+              + 新建任务
+            </button>
+
             <input
-              className="search-input"
-              placeholder="搜索任务 / 产品 / 市场"
+              className="search-input compact-search"
+              placeholder="搜索任务、SKU、市场"
               value={taskQuery}
               onChange={(event) => setTaskQuery(event.target.value)}
             />
 
-            <div className="filter-row">
+            <div className="sidebar-nav">
+              <p className="section-label">导航</p>
+              <div className="nav-list">
+                {workspaceNavItems.map((item) => {
+                  const active =
+                    (item.id === 'overview' && pageId === 'execute') ||
+                    (item.id === 'tasks' && pageId === 'create') ||
+                    (item.id === 'leads' && pageId === 'execute') ||
+                    (item.id === 'conversations' && pageId === 'conversation')
+
+                  return (
+                    <button key={item.id} type="button" className={active ? 'nav-item active' : 'nav-item'} onClick={() => setPageId(item.target)}>
+                      {item.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="recent-head">
+              <div>
+                <p className="section-label">最近任务</p>
+                <h3>{taskStatusSummary(normalizedTasks)}</h3>
+              </div>
+              <span className="muted-text">{filteredTasks.length} 条</span>
+            </div>
+
+            <div className="filter-row sidebar-filter-row">
               {taskStatusFilters.map((item) => (
                 <button key={item} type="button" className={taskFilter === item ? 'filter-chip active' : 'filter-chip'} onClick={() => setTaskFilter(item)}>
                   {item}
@@ -1072,30 +1136,31 @@ function App() {
                 </button>
               ))}
             </div>
+
+            <div className="sidebar-footer">
+              <div className="user-chip user-footer-chip">
+                <span>{currentUser.name}</span>
+                <small>{bootstrap.brands.find((brand) => brand.id === brandId)?.name || '-'}</small>
+              </div>
+              <button type="button" className="chip-button" onClick={handleLogout}>
+                退出
+              </button>
+            </div>
           </section>
         </aside>
 
         <main className="center-column">
-          <section className="panel summary-strip">
-            <div className="summary-block">
-              <span>产品</span>
-              <strong>{taskDraft.productName}</strong>
+          <section className="panel context-bar">
+            <div className="context-bar-main">
+              <strong>{bootstrap.brands.find((brand) => brand.id === brandId)?.name || '-'}</strong>
+              <span>{taskDraft.productName}</span>
+              <span>{taskDraft.market}</span>
+              <span>{taskDraft.industryDirection}</span>
             </div>
-            <div className="summary-block">
-              <span>市场</span>
-              <strong>{taskDraft.market}</strong>
-            </div>
-            <div className="summary-block">
-              <span>行业方向</span>
-              <strong>{taskDraft.industryDirection}</strong>
-            </div>
-            <div className="summary-block">
-              <span>合作约束</span>
-              <strong>{`佣金 ≤ ${taskForm.commissionCap}%`}</strong>
-            </div>
-            <div className="summary-block">
-              <span>目标触达</span>
-              <strong>{`${taskForm.targetReach} 位达人`}</strong>
+            <div className="context-bar-side">
+              <span>{`目标 ${taskForm.targetReach} 位达人`}</span>
+              <span>{`佣金 ≤ ${taskForm.commissionCap}%`}</span>
+              <span>{taskForm.allowSeeding ? '支持寄样' : '不寄样'}</span>
             </div>
           </section>
 
@@ -1110,6 +1175,66 @@ function App() {
 
             {pageId === 'create' ? (
               <div className="create-layout">
+                <section className="form-card prompt-card">
+                  <div className="table-card-head">
+                    <div>
+                      <p className="section-label">自然语言创建</p>
+                      <h3>先描述目标，再生成任务</h3>
+                    </div>
+                  </div>
+                  <label className="composer-field">
+                    <span>任务描述</span>
+                    <textarea
+                      className="prompt-textarea"
+                      value={taskPrompt}
+                      onChange={(event) => setTaskPrompt(event.target.value)}
+                      placeholder="例如：帮我创建一个美国健身类 TikTok 达人首轮触达任务，目标 50 人，合作方式寄样 + 佣金，佣金不超过 14%。"
+                    />
+                  </label>
+                  <div className="quick-prompt-row">
+                    {quickPromptPresets.map((item) => (
+                      <button key={item} type="button" className="filter-chip" onClick={() => setTaskPrompt(item)}>
+                        {item}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="form-card structured-card">
+                  <div className="table-card-head">
+                    <div>
+                      <p className="section-label">任务说明</p>
+                      <h3>结构化结果</h3>
+                    </div>
+                  </div>
+                  <div className="structured-summary-grid">
+                    <article className="summary-block compact">
+                      <span>任务</span>
+                      <strong>{taskDraft.taskName}</strong>
+                    </article>
+                    <article className="summary-block compact">
+                      <span>产品</span>
+                      <strong>{taskDraft.productName}</strong>
+                    </article>
+                    <article className="summary-block compact">
+                      <span>市场</span>
+                      <strong>{taskDraft.market}</strong>
+                    </article>
+                    <article className="summary-block compact">
+                      <span>目标平台</span>
+                      <strong>{taskDraft.platforms.join(' / ') || '-'}</strong>
+                    </article>
+                    <article className="summary-block compact">
+                      <span>触达方式</span>
+                      <strong>{taskDraft.outreachMethods.join(' / ') || '-'}</strong>
+                    </article>
+                    <article className="summary-block compact">
+                      <span>目标人数</span>
+                      <strong>{`${taskDraft.targetReach} 位达人`}</strong>
+                    </article>
+                  </div>
+                </section>
+
                 <section className="form-card">
                   <h4>任务信息</h4>
                   <div className="field-grid">
@@ -1248,7 +1373,11 @@ function App() {
             {pageId === 'execute' ? (
               <div className="execute-layout">
                 <div className="execute-toolbar">
-                  <p className="helper-text">这里只统计“当前任务”里的线索。点上方任一状态，会筛出对应对象。</p>
+                  <div className="execute-toolbar-copy">
+                    <p className="section-label">执行台</p>
+                    <h3>{activeTaskSummary.title}</h3>
+                    <p className="helper-text">这里只统计当前任务。上面看漏斗，下面推进线索。</p>
+                  </div>
                   <input
                     className="search-input"
                     placeholder="搜索达人 / 平台 / 联系方式"
