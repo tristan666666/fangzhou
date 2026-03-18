@@ -14,12 +14,13 @@ const taskPageTabs = [
 ]
 
 const workspaceNavItems = [
-  { id: 'overview', label: '总览', target: 'execute' },
+  { id: 'overview', label: '总览', target: 'overview' },
   { id: 'tasks', label: '任务', target: 'create' },
-  { id: 'leads', label: '线索', target: 'execute' },
+  { id: 'assets', label: '资产', target: 'execute' },
   { id: 'conversations', label: '会话', target: 'conversation' },
-  { id: 'brand', label: '品牌资料', target: 'create' },
-  { id: 'settings', label: '设置', target: 'create' },
+  { id: 'brand', label: '品牌资料', target: 'brand' },
+  { id: 'channels', label: '通道状态', target: 'channels' },
+  { id: 'settings', label: '设置', target: 'settings' },
 ]
 
 const quickPromptPresets = [
@@ -865,7 +866,7 @@ function App() {
       return (
         <>
           <section className="detail-card">
-            <p className="section-label">线索详情</p>
+            <p className="section-label">资产详情</p>
             <h3>{selectedLead.name}</h3>
             <div className="detail-list">
               <article><span>平台</span><strong>{selectedLead.platform}</strong></article>
@@ -921,7 +922,7 @@ function App() {
     return (
       <>
         <section className="detail-card">
-          <p className="section-label">任务说明</p>
+          <p className="section-label">AI 副驾驶</p>
           <h3>{taskDraft.taskName}</h3>
           <div className="detail-list">
             <article><span>产品</span><strong>{taskDraft.productName}</strong></article>
@@ -955,9 +956,9 @@ function App() {
     return (
       <div className="login-shell">
         <div className="login-hero">
-          <p className="eyebrow">Creator BD</p>
+          <p className="eyebrow">Outreach OS</p>
           <h1>方洲AI</h1>
-          <p>帮跨境品牌把红人 BD 从“找人”推进到“会话”和“结果”。</p>
+          <p>帮跨境品牌把外联沟通、合作推进和资产沉淀统一到一个操作台里。</p>
           <p className="helper-text">{bootstrap.authMode === 'supabase' ? '当前已启用正式账号体系' : '当前还是 demo 登录，接上 Supabase Auth 后可启用正式账号'}</p>
         </div>
         <div className="login-panel">
@@ -1015,7 +1016,7 @@ function App() {
         <div className="brand-inline">
           <div className="brand-stack">
             <strong>方洲AI</strong>
-            <span>红人 BD 系统</span>
+            <span>外联与资产系统</span>
           </div>
         </div>
         <div className="toolbar-inline">
@@ -1085,11 +1086,7 @@ function App() {
               <p className="section-label">导航</p>
               <div className="nav-list">
                 {workspaceNavItems.map((item) => {
-                  const active =
-                    (item.id === 'overview' && pageId === 'execute') ||
-                    (item.id === 'tasks' && pageId === 'create') ||
-                    (item.id === 'leads' && pageId === 'execute') ||
-                    (item.id === 'conversations' && pageId === 'conversation')
+                  const active = item.target === pageId
 
                   return (
                     <button key={item.id} type="button" className={active ? 'nav-item active' : 'nav-item'} onClick={() => setPageId(item.target)}>
@@ -1165,13 +1162,142 @@ function App() {
           </section>
 
           <section className="panel tab-panel">
-            <div className="mode-switch">
-              {taskPageTabs.map((tab) => (
-                <button key={tab.id} type="button" className={pageId === tab.id ? 'mode-chip active' : 'mode-chip'} onClick={() => setPageId(tab.id)}>
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+            {['create', 'execute', 'conversation'].includes(pageId) ? (
+              <div className="mode-switch">
+                {taskPageTabs.map((tab) => (
+                  <button key={tab.id} type="button" className={pageId === tab.id ? 'mode-chip active' : 'mode-chip'} onClick={() => setPageId(tab.id)}>
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {pageId === 'overview' ? (
+              <div className="overview-layout">
+                <section className="summary-strip">
+                  <div className="summary-block">
+                    <span>本周新增资产</span>
+                    <strong>{dashboard.dataCenter?.influencerPool || 0}</strong>
+                  </div>
+                  <div className="summary-block">
+                    <span>已触达</span>
+                    <strong>{dashboard.overview?.outreachInProgress || 0}</strong>
+                  </div>
+                  <div className="summary-block">
+                    <span>高意向</span>
+                    <strong>{dashboard.overview?.warmLeads || 0}</strong>
+                  </div>
+                  <div className="summary-block">
+                    <span>待回填</span>
+                    <strong>{dashboard.overview?.pendingRefillCount || 0}</strong>
+                  </div>
+                  <div className="summary-block">
+                    <span>最近提醒</span>
+                    <strong>{dashboard.reminders?.length || 0}</strong>
+                  </div>
+                </section>
+
+                <section className="table-card">
+                  <div className="table-card-head">
+                    <div>
+                      <p className="section-label">总览</p>
+                      <h3>系统正在推进的工作</h3>
+                    </div>
+                  </div>
+                  <div className="timeline-list">
+                    {timeline.slice(0, 6).map((item, index) => (
+                      <article key={`${item.time}-${item.title}-${index}`} className="timeline-item">
+                        <span>{item.time}</span>
+                        <strong>{item.title}</strong>
+                        <p>{item.detail}</p>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              </div>
+            ) : null}
+
+            {pageId === 'brand' ? (
+              <div className="settings-layout">
+                <section className="form-card">
+                  <div className="table-card-head">
+                    <div>
+                      <p className="section-label">品牌资料</p>
+                      <h3>AI 可调用的知识底座</h3>
+                    </div>
+                  </div>
+                  <div className="field-grid">
+                    <label>
+                      <span>品牌介绍</span>
+                      <textarea defaultValue="方洲AI 帮跨境品牌把外联沟通、会话推进和合作资产沉淀统一到一个操作台里。" />
+                    </label>
+                    <label>
+                      <span>产品卖点</span>
+                      <textarea defaultValue="便携、适合健身与恢复场景、适合短视频种草与测评。" />
+                    </label>
+                    <label>
+                      <span>合作方式</span>
+                      <textarea defaultValue="寄样 + 佣金，必要时可人工接管高价值合作。" />
+                    </label>
+                    <label>
+                      <span>常见问答</span>
+                      <textarea defaultValue="可提供品牌介绍、过往 campaign、物流说明和基础 KPI 目标。" />
+                    </label>
+                  </div>
+                </section>
+              </div>
+            ) : null}
+
+            {pageId === 'channels' ? (
+              <div className="settings-layout">
+                <section className="table-card">
+                  <div className="table-card-head">
+                    <div>
+                      <p className="section-label">通道状态</p>
+                      <h3>当前可用能力</h3>
+                    </div>
+                  </div>
+                  <div className="structured-summary-grid">
+                    <article className="summary-block compact"><span>Gmail</span><strong>已授权 / 可发送</strong></article>
+                    <article className="summary-block compact"><span>Instagram</span><strong>已授权 / 可抓取 / 可 DM</strong></article>
+                    <article className="summary-block compact"><span>TikTok</span><strong>可抓取 / 私信受限</strong></article>
+                    <article className="summary-block compact"><span>YouTube</span><strong>可抓取</strong></article>
+                    <article className="summary-block compact"><span>WhatsApp</span><strong>未连接</strong></article>
+                  </div>
+                </section>
+              </div>
+            ) : null}
+
+            {pageId === 'settings' ? (
+              <div className="settings-layout">
+                <section className="form-card">
+                  <div className="table-card-head">
+                    <div>
+                      <p className="section-label">设置</p>
+                      <h3>默认偏好</h3>
+                    </div>
+                  </div>
+                  <div className="field-grid">
+                    <label>
+                      <span>默认英语风格</span>
+                      <select defaultValue="自然专业">
+                        <option>自然专业</option>
+                        <option>更强势</option>
+                        <option>更保守</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>自动跟进规则</span>
+                      <select defaultValue="48小时后提醒">
+                        <option>48小时后提醒</option>
+                        <option>72小时后提醒</option>
+                        <option>仅人工处理</option>
+                      </select>
+                    </label>
+                  </div>
+                </section>
+              </div>
+            ) : null}
 
             {pageId === 'create' ? (
               <div className="create-layout">
@@ -1455,8 +1581,8 @@ function App() {
                 <div className="execute-main">
                   <section className="table-card">
                     <div className="table-card-head">
-                      <div>
-                        <p className="section-label">线索表</p>
+                    <div>
+                        <p className="section-label">品牌资产池</p>
                         <h3>{activeTaskSummary.title}</h3>
                       </div>
                       <span className="muted-text">{`${filteredLeads.length} 条结果`}</span>

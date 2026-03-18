@@ -377,7 +377,9 @@
 .create-layout,
 .execute-layout,
 .conversation-page,
-.execute-main {
+.execute-main,
+.overview-layout,
+.settings-layout {
   display: grid;
   gap: 14px;
   min-height: 0;
@@ -435,6 +437,11 @@
 .form-card label {
   display: grid;
   gap: 6px;
+}
+
+.form-card textarea {
+  min-height: 120px;
+  resize: vertical;
 }
 
 .toggle-grid,
