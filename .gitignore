@@ -5,6 +5,9 @@ dist/
 .env.*.local
 *.log
 cloudflared.exe
+cloudflared.err
+login-check.png
+render-live.png
 coverage/
 .DS_Store
 Thumbs.db
