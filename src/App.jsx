@@ -1,1037 +1,1355 @@
 import { useEffect, useMemo, useState } from 'react'
 import './app.css'
 
+const navItems = [
+  { id: 'overview', label: '总览' },
+  { id: 'tasks', label: '任务' },
+  { id: 'assets', label: '资产' },
+  { id: 'conversations', label: '会话' },
+  { id: 'brand', label: '品牌资料' },
+  { id: 'channels', label: '通道状态' },
+  { id: 'settings', label: '设置' },
+]
+
+const quickExamples = [
+  '帮我创建一个美国健身类 TikTok 达人首轮触达任务，目标 50 人，合作方式为寄样 + 佣金，佣金不超过 14%。',
+  '整理一批适合筋膜枪冷启动的 Deal 站，并给出首轮建联切入点。',
+  '建立一个 YouTube 测评合作任务，先找 20 个可寄样、粉丝 10 万以下的账号。',
+  '创建健康类媒体 PR 名单任务，输出媒体名单、联系人线索和首轮沟通框架。',
+]
+
+const channelPresets = [
+  { name: 'Gmail', ability: '可发送', status: '已授权', note: '适合邮件首轮触达与长文本沟通' },
+  { name: 'Instagram DM', ability: '可发送 / 可跟进', status: '已授权', note: '适合红人私信和轻量跟进' },
+  { name: 'TikTok', ability: '可抓取', status: '可用', note: '适合候选对象搜集，私信权限受平台限制' },
+  { name: 'YouTube', ability: '可抓取', status: '可用', note: '适合测评账号与媒体型对象发现' },
+  { name: 'OpenCloud', ability: '外部 Agent 执行', status: '可接入', note: '适合跑搜集、整理、回填任务' },
+  { name: 'Codex', ability: '外部 Agent 执行', status: '可接入', note: '适合执行结构化任务和回填执行结果' },
+]
+
 const emptyDashboard = {
-  tasks: [],
-  leadsByTask: {},
+  brandId: '',
+  overview: {
+    tagline: '',
+    weeklyCreatorGoal: 0,
+    outreachInProgress: 0,
+    warmLeads: 0,
+    todayTaskCount: 0,
+    recentResultCount: 0,
+    pendingRefillCount: 0,
+    reminderCount: 0,
+  },
+  dataCenter: {
+    influencerPool: 0,
+    dealSitePool: 0,
+    mediaPool: 0,
+    activeOutreach: 0,
+    historyTaskCount: 0,
+  },
+  recentResults: [],
   reminders: [],
+  tasks: [],
+  activeTaskId: '',
+  leadsByTask: {},
 }
 
-const taskPageTabs = [
-  { id: 'create', label: '创建任务' },
-  { id: 'execute', label: '执行台' },
-  { id: 'conversation', label: '会话处理' },
-]
+const loginSeed = {
+  username: 'demo@fangzhou.ai',
+  password: 'demo123',
+}
 
-const workspaceNavItems = [
-  { id: 'overview', label: '总览', target: 'overview' },
-  { id: 'tasks', label: '任务', target: 'create' },
-  { id: 'assets', label: '资产', target: 'execute' },
-  { id: 'conversations', label: '会话', target: 'conversation' },
-  { id: 'brand', label: '品牌资料', target: 'brand' },
-  { id: 'channels', label: '通道状态', target: 'channels' },
-  { id: 'settings', label: '设置', target: 'settings' },
-]
+const brandProfileSeed = {
+  intro: '我们是一套套在外部 Agent 之上的跨境外联业务壳层，负责统一记忆、任务编排、回填和资产沉淀。',
+  productPoints: '筋膜枪 / 恢复类设备 / 居家健身',
+  cooperationModes: '寄样 + 佣金，优先长期合作，默认不接受固定坑位费',
+  campaignProof: '首轮重点验证 TikTok / Instagram / YouTube / Deal 站的外联效率和回填闭环。',
+  faq: '是否支持寄样、佣金边界、物流周期、品牌卖点、竞品差异。',
+}
 
-const quickPromptPresets = [
-  '帮我创建一个美国健身类 TikTok 达人首轮触达任务，目标 50 人，合作方式寄样 + 佣金，佣金不超过 14%。',
-  '创建一个 Deal 站新品冷启动任务，目标本周拿到 15 个可合作站点。',
-  '整理一批 YouTube 测评达人，优先找 10 万粉以下、可寄样的账号。',
-  '建立一个媒体 PR 建联任务，先筛 20 个适合筋膜枪品类的健康媒体。',
-]
-
-const taskStatusFilters = ['全部', '草稿', '执行中', '待回复', '已完成']
-const inboxStatusFilters = ['全部', '待处理', '待接管', '已回复']
-const leadStatuses = ['已抓取', '初筛通过', '已触达', '已回复', '洽谈中', '待人工接管', '已确认合作']
-const handlingModes = ['自动触达', 'AI辅助回复', '人工接管']
-
-const defaultForm = {
-  taskName: '美国健身达人首轮触达',
-  productName: '筋膜枪 SKU-01',
-  market: '美国',
-  industryDirection: '健身',
-  platforms: { TikTok: true, Instagram: true, YouTube: false, Deal站: false },
-  outreachMethods: { Gmail: true, 'Instagram DM': true, 'TikTok DM': false, WhatsApp: false },
-  creatorTier: '5k - 100k',
-  cooperationModel: '寄样 + 佣金',
-  commissionCap: 14,
-  allowSeeding: true,
-  allowFixedFee: false,
-  avoidCompetitors: true,
-  targetReach: 50,
+const settingsSeed = {
+  englishTone: '自然专业',
+  followupRule: '48 小时后自动提醒复查，复杂对话进入人工接管',
+  summaryRule: '每次回填后自动生成摘要、下一步动作和资产更新建议',
 }
 
 async function apiFetch(path, options = {}, token = '') {
   const headers = {
     'Content-Type': 'application/json',
-    ...(options.headers ?? {}),
+    ...(options.headers || {}),
   }
+
   if (token) headers.Authorization = `Bearer ${token}`
+
   const response = await fetch(path, { ...options, headers })
   if (!response.ok) {
-    const body = await response.json().catch(() => ({}))
-    throw new Error(body.error || 'REQUEST_FAILED')
+    const payload = await response.json().catch(() => ({}))
+    throw new Error(payload.error || payload.detail || 'REQUEST_FAILED')
   }
+
   return response.json()
 }
 
-function formatTime(value) {
+function formatDateTime(value) {
   if (!value) return '-'
-  return new Date(value).toLocaleString('zh-CN', { hour12: false })
-}
-
-function toDateTimeLocalValue(value) {
-  if (!value) return ''
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  const pad = (num) => String(num).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  if (Number.isNaN(date.getTime())) return '-'
+  return date.toLocaleString('zh-CN', { hour12: false })
 }
 
-function makeReminderIso(hoursAhead) {
-  return new Date(Date.now() + hoursAhead * 60 * 60 * 1000).toISOString()
-}
-
-function enabledLabels(record) {
-  return Object.entries(record)
-    .filter(([, enabled]) => enabled)
-    .map(([label]) => label)
+function shortDate(value) {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '-'
+  return date.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })
 }
 
 function normalizeTaskStatus(status) {
-  const value = String(status || '').toLowerCase()
-  if (['done', 'success', 'completed', '已完成', '执行成功'].includes(value)) return '已完成'
-  if (['needs_reply', 'waiting_reply', '待回复'].includes(value)) return '待回复'
-  if (['running', 'submitted', '执行中', '已发送到本地连接器'].includes(value)) return '执行中'
-  if (['draft', 'pending', '待执行', '草稿', '待执行中'].includes(value)) return '草稿'
-  return status || '草稿'
+  if (!status) return '草稿'
+  if (String(status).includes('完成')) return '已完成'
+  if (String(status).includes('执行中')) return '执行中'
+  if (String(status).includes('回填')) return '待回填'
+  if (String(status).includes('生成')) return '待发送'
+  return status
 }
 
-function buildTaskInstruction(form) {
-  const platforms = enabledLabels(form.platforms).join(' / ')
-  const methods = enabledLabels(form.outreachMethods).join(' / ')
-  const constraints = [
-    `佣金上限 ${form.commissionCap}%`,
-    form.allowSeeding ? '可寄样' : '不可寄样',
-    form.allowFixedFee ? '可接受固定费' : '不接受固定费',
-    form.avoidCompetitors ? '排除竞品达人' : '可接受竞品达人',
-  ]
+function parseInstruction(task) {
+  const lines = String(task?.instruction || '').split('\n')
+  const getValue = (label) => {
+    const line = lines.find((item) => item.startsWith(`${label}：`))
+    return line ? line.slice(label.length + 1).trim() : ''
+  }
+
+  return {
+    title: getValue('任务名称') || task?.structuredTask?.objective || '未命名任务',
+    product: getValue('产品') || '未填写产品',
+    market: getValue('市场') || '未填写市场',
+    direction: getValue('行业方向') || '未填写方向',
+    platforms: getValue('目标平台') || '未填写平台',
+    outreach: getValue('触达方式') || '未填写方式',
+    constraints: getValue('合作约束') || '未填写约束',
+    target: getValue('目标触达') || '未填写目标',
+  }
+}
+
+function promptBlueprint(prompt) {
+  const text = String(prompt || '')
+  const lowered = text.toLowerCase()
+  const targets = []
+  if (lowered.includes('tiktok')) targets.push('TikTok')
+  if (lowered.includes('instagram')) targets.push('Instagram')
+  if (lowered.includes('youtube')) targets.push('YouTube')
+  if (text.includes('Deal')) targets.push('Deal 站')
+  if (text.includes('媒体') || lowered.includes('pr')) targets.push('媒体 / PR')
+  if (targets.length === 0) targets.push('TikTok', 'Instagram')
+
+  const objectType =
+    text.includes('Deal') ? 'Deal 站 / 导购站'
+      : text.includes('媒体') || lowered.includes('pr') ? '媒体 / PR'
+        : text.includes('联盟') ? '联盟客 / Affiliate'
+          : '达人 / 创作者'
+
+  const workflow =
+    text.includes('话术') || text.includes('回复') ? 'AI 辅助回复'
+      : text.includes('名单') || text.includes('搜集') ? '外部 Agent 搜集 + 人工复核'
+        : '外部 Agent 搜集 + 云端回填'
+
+  return {
+    objectType,
+    workflow,
+    targets,
+    deliverables: ['结构化名单', '首轮触达框架', '回填摘要', '下一步动作'],
+    memory: ['品牌资料', '历史会话', '合作约束', '资产标签'],
+  }
+}
+
+function buildMockAssets(task) {
+  const summary = parseInstruction(task)
+  const titleHint = summary.title || '当前任务'
 
   return [
-    `任务名称：${form.taskName}`,
-    `产品：${form.productName}`,
-    `市场：${form.market}`,
-    `行业方向：${form.industryDirection}`,
-    `目标平台：${platforms || '未选择'}`,
-    `触达方式：${methods || '未选择'}`,
-    `达人范围：${form.creatorTier}`,
-    `合作方式：${form.cooperationModel}`,
-    `合作约束：${constraints.join('；')}`,
-    `目标触达：${form.targetReach} 位达人`,
-  ].join('\n')
-}
-
-function buildTaskDraft(form) {
-  const platforms = enabledLabels(form.platforms)
-  const methods = enabledLabels(form.outreachMethods)
-  const estimatedPool = form.targetReach * 2 + 26
-  const autoReach = Math.max(12, Math.round(form.targetReach * 0.62))
-  const assistReach = Math.max(6, Math.round(form.targetReach * 0.26))
-  const manualReach = Math.max(2, form.targetReach - autoReach - assistReach)
-  const constraints = [
-    `佣金上限：${form.commissionCap}%`,
-    `寄样：${form.allowSeeding ? '允许' : '不允许'}`,
-    `固定坑位费：${form.allowFixedFee ? '允许' : '不允许'}`,
-    `竞品达人：${form.avoidCompetitors ? '排除' : '可接受'}`,
-  ]
-
-  return {
-    taskName: form.taskName,
-    productName: form.productName,
-    market: form.market,
-    industryDirection: form.industryDirection,
-    platforms,
-    outreachMethods: methods,
-    creatorTier: form.creatorTier,
-    cooperationModel: form.cooperationModel,
-    targetReach: form.targetReach,
-    estimatedPool,
-    autoReach,
-    assistReach,
-    manualReach,
-    constraints,
-    missingInfo: methods.length === 0 ? ['至少选择一种触达方式'] : [],
-  }
-}
-
-function summarizeTask(task, draft = null) {
-  if (!task) {
-    return {
-      title: draft?.taskName || '未创建任务',
-      meta: draft?.productName || '-',
-      status: '草稿',
-    }
-  }
-
-  const instruction = task.instruction || ''
-  const taskName = instruction.match(/任务名称：(.+)/)?.[1]?.trim()
-  const productName = instruction.match(/产品：(.+)/)?.[1]?.trim()
-  const market = instruction.match(/市场：(.+)/)?.[1]?.trim()
-  const target = instruction.match(/目标触达：(.+位达人)/)?.[1]?.trim()
-
-  return {
-    title: taskName || `${market || '市场未写'} / ${target || '目标未写'}`,
-    meta: productName || '产品未写',
-    status: normalizeTaskStatus(task.status),
-  }
-}
-
-function buildLeadRows(task, draft) {
-  if (!task) return []
-
-  const baseRows = [
     {
+      id: `mock-${task.id}-1`,
+      taskId: task.id,
       name: 'Mia Moves',
+      type: '达人',
       platform: 'TikTok',
-      followers: '12.4万',
       fitScore: 92,
-      contact: 'Gmail',
-      status: '已回复',
-      handling: 'AI辅助回复',
-      lastAction: '达人报 $250 + 寄样',
-      nextAction: '给 3 个回复版本',
-      intent: '有兴趣，但报价超约束',
-      risk: '固定费超出当前合作约束',
-      notes: '内容风格贴近居家健身，评论区互动质量高。',
-      conversation: [
-        { role: 'system', text: `当前合作约束：${draft.constraints.join('；')}` },
-        { role: 'agent', text: 'Hi Mia, we are exploring a sample + commission collaboration for the US fitness audience.' },
-        { role: 'creator', text: 'I can do it for $250 + gifted product.' },
-      ],
-    },
-    {
-      name: 'Coach Lena',
-      platform: 'Instagram',
-      followers: '31万',
-      fitScore: 89,
       contact: 'Instagram DM',
-      status: '洽谈中',
-      handling: '人工接管',
-      lastAction: '对方询问排期和历史案例',
-      nextAction: '补品牌资料并人工跟进',
-      intent: '高价值候选，需要深聊',
-      risk: '涉及排期、案例和 exclusivity',
-      notes: '账号内容质量高，适合品牌形象合作。',
+      status: '待回复',
+      handling: 'AI 辅助回复',
+      relationship: '首次沟通',
+      lastAction: '对方回复可合作，但提出固定费用',
+      nextAction: '给出 3 版回复建议，判断是否人工接管',
+      reminderAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      note: `${titleHint} 的高匹配对象，适合优先推进。`,
       conversation: [
-        { role: 'system', text: '高价值对象，建议人工接管。' },
-        { role: 'creator', text: 'Can you share more details about timing, expected deliverables, and previous campaigns?' },
+        { role: 'agent', text: 'Hi Mia, we are exploring a sample + commission collaboration for the US fitness audience.' },
+        { role: 'external', text: 'I can do it, but I usually charge a fixed fee. What is your budget?' },
       ],
     },
     {
-      name: 'HomeGym Abby',
-      platform: 'TikTok',
-      followers: '6.8万',
-      fitScore: 87,
+      id: `mock-${task.id}-2`,
+      taskId: task.id,
+      name: 'Wellness Weekly',
+      type: '媒体 / PR',
+      platform: 'Editorial',
+      fitScore: 84,
+      contact: 'Gmail',
+      status: '待接管',
+      handling: '人工接管',
+      relationship: '索要品牌资料',
+      lastAction: '要求提供品牌背景与过往案例',
+      nextAction: '调用品牌资料页内容，补发品牌介绍与 campaign case',
+      reminderAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
+      note: '媒体型对象，需要更完整的资料底座。',
+      conversation: [
+        { role: 'external', text: 'Please share your brand background, KPI expectations and previous campaign examples.' },
+      ],
+    },
+    {
+      id: `mock-${task.id}-3`,
+      taskId: task.id,
+      name: 'Gym Deal Hunter',
+      type: 'Deal 站',
+      platform: 'Deal Site',
+      fitScore: 79,
       contact: 'Gmail',
       status: '已触达',
       handling: '自动触达',
-      lastAction: '首轮消息已发',
-      nextAction: '等待 48 小时后自动二跟',
-      intent: '等待回复',
-      risk: '暂无',
-      notes: '适合标准化首轮触达。',
-      conversation: [{ role: 'system', text: '已发送首轮触达，暂时无需人工介入。' }],
+      relationship: '已进入候选池',
+      lastAction: '首轮触达已发出',
+      nextAction: '48 小时后自动检查是否回复',
+      reminderAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+      note: '标准化对象，适合自动化处理。',
+      conversation: [
+        { role: 'agent', text: 'Hello, we are launching a new recovery product and would love to explore a feature on your site.' },
+      ],
     },
     {
-      name: 'Fit Deals Hub',
-      platform: 'Deal站',
-      followers: '站点',
-      fitScore: 81,
-      contact: 'Gmail',
-      status: '初筛通过',
-      handling: '自动触达',
-      lastAction: '已进入候选池',
-      nextAction: '等待批量发送',
-      intent: '可批量推进',
-      risk: '需确认站点受众匹配',
-      notes: 'Deal 站资源，适合低成本引流测试。',
-      conversation: [{ role: 'system', text: '已通过初筛，等待首轮建联。' }],
-    },
-    {
-      name: 'Lift With Nora',
-      platform: 'Instagram',
-      followers: '8.2万',
-      fitScore: 84,
-      contact: 'Instagram DM',
-      status: '已抓取',
-      handling: '自动触达',
-      lastAction: '抓取到主页与邮箱',
-      nextAction: '判断内容风格是否入池',
-      intent: '待初筛',
-      risk: '暂无',
-      notes: '主页风格偏女性力量训练，待确认是否匹配产品受众。',
-      conversation: [{ role: 'system', text: '刚进入候选池，还没有会话。' }],
-    },
-    {
-      name: 'Wellness Weekly',
-      platform: '媒体 PR',
-      followers: '媒体',
-      fitScore: 76,
-      contact: 'Gmail',
-      status: '待人工接管',
-      handling: '人工接管',
-      lastAction: '对方要求品牌背景与媒体包',
-      nextAction: '准备品牌资料后再回',
-      intent: '需提供更完整品牌信息',
-      risk: '信息不完整会影响推进',
-      notes: '媒体方问得比较细，不适合自动回复。',
-      conversation: [{ role: 'creator', text: 'Please send over your brand background, KPIs, and campaign examples.' }],
-    },
-    {
+      id: `mock-${task.id}-4`,
+      taskId: task.id,
       name: 'PowerCore Jay',
+      type: 'YouTube 测评',
       platform: 'YouTube',
-      followers: '22万',
-      fitScore: 83,
+      fitScore: 88,
       contact: 'Gmail',
-      status: '已确认合作',
+      status: '已合作',
       handling: '人工接管',
-      lastAction: '已确认寄样 + 佣金',
-      nextAction: '移交履约',
-      intent: '已达成合作',
-      risk: '需跟踪发样和发布时间',
-      notes: '可作为本任务示范案例。',
-      conversation: [{ role: 'creator', text: 'Sounds good. I am happy with gifted product + commission. Let us move ahead.' }],
+      relationship: '已建立合作',
+      lastAction: '样品与佣金方案已确认',
+      nextAction: '推进履约与发布时间',
+      reminderAt: null,
+      note: '可作为后续案例与素材沉淀。',
+      conversation: [
+        { role: 'external', text: 'Sounds good. I am happy with gifted product + commission. Let us move forward.' },
+      ],
     },
   ]
-
-  return baseRows.map((lead, index) => ({
-    id: `${task.id}-lead-${index + 1}`,
-    ...lead,
-  }))
 }
 
-function buildFunnel(leads) {
+function buildSuggestionSet(asset) {
+  if (!asset) return []
+
+  const latestIncoming = asset.conversation.filter((item) => item.role === 'external').at(-1)?.text || ''
+  if (/fee|budget|charge/i.test(latestIncoming)) {
+    return [
+      { title: '控制预算版', body: '感谢回复。我们这轮更偏向寄样 + 佣金合作，当前暂不接受固定费用。如果你愿意，我们可以先从一轮测试合作开始。' },
+      { title: '继续推进版', body: '谢谢你给出报价。为了确保这轮合作匹配，我先把 deliverables 和 campaign 目标发给你，你看过后我们再一起确认方式。' },
+      { title: '转人工版', body: '这个对象已经触碰合作约束，建议转人工接管，由你决定是否放宽边界。' },
+    ]
+  }
+
+  if (/brand background|campaign|examples/i.test(latestIncoming)) {
+    return [
+      { title: '补品牌资料版', body: '当然可以。我先把品牌背景、产品卖点和过往合作方式整理给你，如果方向一致，我们再确认下一步节奏。' },
+      { title: '压缩沟通版', body: '我先发你一页简版资料：品牌定位、产品卖点和本次合作目标。你看过后我们就能快速判断是否值得推进。' },
+      { title: '人工接管提醒', body: '这类问题适合调用品牌资料页内容，并由人工做最后确认。' },
+    ]
+  }
+
+  return [{ title: '常规跟进版', body: '收到，我这边先整理更完整的信息给你。你方便的话，我们本周继续往下推进。' }]
+}
+
+function assetStageCounts(assets) {
   const counts = {
     已抓取: 0,
     初筛通过: 0,
     已触达: 0,
-    已回复: 0,
+    待回复: 0,
     洽谈中: 0,
-    已确认合作: 0,
-    待人工接管: 0,
+    已合作: 0,
+    待接管: 0,
   }
 
-  leads.forEach((lead) => {
-    if (counts[lead.status] !== undefined) counts[lead.status] += 1
+  assets.forEach((asset) => {
+    if (counts[asset.status] !== undefined) counts[asset.status] += 1
   })
 
   return counts
 }
 
-function buildTaskTimeline(task, draft, funnel) {
-  if (!task) return []
-  if (Array.isArray(task.logs) && task.logs.length > 0) {
-    return task.logs
-      .slice()
-      .reverse()
-      .map((log) => ({
-        time: formatTime(log.at),
-        title: log.level === 'info' ? '系统动作' : '系统记录',
-        detail: log.message,
-      }))
-  }
-  return [
-    { time: formatTime(task.createdAt), title: '创建任务', detail: `${draft.taskName} 已创建` },
-    { time: '今天 09:42', title: '抓取候选池', detail: `已抓取 ${draft.estimatedPool} 个候选对象` },
-    { time: '今天 10:10', title: '初筛完成', detail: `当前有 ${funnel.初筛通过} 位进入首轮候选` },
-    { time: '今天 11:25', title: '开始触达', detail: `已触达 ${funnel.已触达 + funnel.已回复 + funnel.洽谈中 + funnel.已确认合作} 位达人` },
-    { time: '今天 12:06', title: '会话升级', detail: `需要 AI辅助回复 ${funnel.已回复} 位，人工接管 ${funnel.待人工接管 + funnel.洽谈中} 位` },
-  ]
-}
-
-function aiSuggestions(lead, draft) {
-  if (!lead) return []
-
-  const latestIncoming = lead.conversation.filter((item) => item.role === 'creator').at(-1)?.text || ''
-
-  if (/250|fee|报价|price/i.test(latestIncoming)) {
-    return [
-      {
-        label: '压价版',
-        text: `谢谢回复。我们这轮主要按 ${draft.cooperationModel} 的合作方式推进，当前佣金上限是 ${draft.constraints[0].replace('佣金上限：', '')}。如果你愿意，我们可以先从轻量测试开始。`,
-        reason: '适合先守住当前合作约束。',
-      },
-      {
-        label: '换纯佣版',
-        text: 'Thanks for sharing. We may not be able to support that fixed fee on this round, but we can offer a stronger commission-first structure if the fit is right.',
-        reason: '适合坚持不接受固定费的约束。',
-      },
-      {
-        label: '继续聊版',
-        text: '感谢你给报价。先让我把这次 campaign 目标和 deliverables 发你，你看完我们再一起确认是否值得推进。',
-        reason: '适合先保留对话，再判断是否转人工接管。',
-      },
-    ]
-  }
-
-  if (/details|timing|deliverables|campaign/i.test(latestIncoming)) {
-    return [
-      {
-        label: '品牌说明版',
-        text: `当然可以。我先把 ${draft.productName} 的品牌背景、这次合作目标和 deliverables 发你，你看完我们再确认排期。`,
-        reason: '适合品牌资料型问题。',
-      },
-      {
-        label: 'KPI 说明版',
-        text: '这次我们更看重内容匹配和实际转化，所以希望先做一轮测试合作，再决定是否扩大预算。',
-        reason: '适合对 KPI 和合作形式做预期管理。',
-      },
-      {
-        label: '推进版',
-        text: '我今天就把 deliverables、时间线和合作方式整理给你。如果你这边没问题，我们本周就可以开始推进。',
-        reason: '适合尽快锁定下一步动作。',
-      },
-    ]
-  }
-
-  return [
-    {
-      label: '常规跟进',
-      text: '收到，我这边先把更多细节整理给你。如果你方便，我们可以继续往下推进。',
-      reason: '适合一般性回复。',
-    },
-  ]
-}
-
-function taskStatusSummary(tasks) {
-  return `任务 ${tasks.length} 条`
-}
-
-function buildTaskTodo(selectedLead, funnel, reminders) {
-  if (!selectedLead) {
-    return reminders?.length ? reminders.slice(0, 3).map((item) => `${item.name}：${formatTime(item.reminderAt)}`) : ['先选择一条线索，再决定下一步动作。']
-  }
-
-  const todos = []
-  if (['已回复', '待人工接管'].includes(selectedLead.status)) {
-    todos.push(`优先处理 ${selectedLead.name}，当前建议：${selectedLead.nextAction}`)
-  }
-  if (funnel.待人工接管 > 0) {
-    todos.push(`还有 ${funnel.待人工接管} 位线索待人工接管`)
-  }
-  if (funnel.已回复 > 0) {
-    todos.push(`还有 ${funnel.已回复} 位线索等待回复处理`)
-  }
-  if (reminders?.length) {
-    todos.push(`最近提醒：${reminders[0].name}，${formatTime(reminders[0].reminderAt)}`)
-  }
-  if (todos.length === 0) {
-    todos.push('当前没有紧急待办，可以继续扩展新线索或推进洽谈中对象。')
-  }
-  return todos
-}
-
-function hydrateLeadRows(task, dashboardLeads, draft) {
-  if (!task) return []
-  if (Array.isArray(dashboardLeads) && dashboardLeads.length > 0) return dashboardLeads
-  return buildLeadRows(task, draft)
-}
-
 function App() {
-  const [bootstrap, setBootstrap] = useState({ brands: [] })
-  const [token, setToken] = useState(() => localStorage.getItem('fz_workbench_token') || '')
+  const [bootstrap, setBootstrap] = useState({ brands: [], modules: [], demoCredentials: loginSeed, storageMode: 'memory', authMode: 'demo' })
+  const [token, setToken] = useState(() => localStorage.getItem('fangzhou_shell_token') || '')
   const [currentUser, setCurrentUser] = useState(null)
   const [dashboard, setDashboard] = useState(emptyDashboard)
   const [brandId, setBrandId] = useState('')
-  const [pageId, setPageId] = useState('execute')
-  const [currentTaskId, setCurrentTaskId] = useState('')
-  const [selectedLeadId, setSelectedLeadId] = useState('')
-  const [stageFilter, setStageFilter] = useState('全部')
-  const [taskQuery, setTaskQuery] = useState('')
-  const [taskFilter, setTaskFilter] = useState('全部')
-  const [leadQuery, setLeadQuery] = useState('')
-  const [conversationQuery, setConversationQuery] = useState('')
-  const [conversationFilter, setConversationFilter] = useState('全部')
-  const [error, setError] = useState('')
-  const [authTab, setAuthTab] = useState('login')
-  const [loggingIn, setLoggingIn] = useState(false)
-  const [registering, setRegistering] = useState(false)
-  const [creatingTask, setCreatingTask] = useState(false)
-  const [sendingReply, setSendingReply] = useState(false)
-  const [updatingLead, setUpdatingLead] = useState(false)
-  const [loginForm, setLoginForm] = useState({ username: 'demo@fangzhou.ai', password: 'demo123' })
-  const [registerForm, setRegisterForm] = useState({ name: '', email: '', password: '' })
-  const [taskForm, setTaskForm] = useState(defaultForm)
-  const [taskPrompt, setTaskPrompt] = useState(
-    '帮我创建一个美国健身类 TikTok 达人首轮触达任务，目标 50 人，合作方式寄样 + 佣金，佣金不超过 14%。',
-  )
+  const [pageId, setPageId] = useState('overview')
+  const [activeTaskId, setActiveTaskId] = useState('')
+  const [selectedAssetId, setSelectedAssetId] = useState('')
+  const [taskSearch, setTaskSearch] = useState('')
+  const [assetSearch, setAssetSearch] = useState('')
+  const [conversationSearch, setConversationSearch] = useState('')
+  const [taskPrompt, setTaskPrompt] = useState(quickExamples[0])
   const [replyDraft, setReplyDraft] = useState('')
-  const [selectedLeadIds, setSelectedLeadIds] = useState([])
-  const [bulkStatus, setBulkStatus] = useState('')
-  const [bulkHandling, setBulkHandling] = useState('')
-  const [bulkNextAction, setBulkNextAction] = useState('')
-  const [bulkReminderAt, setBulkReminderAt] = useState('')
-  const [bulkReminderNote, setBulkReminderNote] = useState('')
-  const [leadReminderAt, setLeadReminderAt] = useState('')
-  const [leadReminderNote, setLeadReminderNote] = useState('')
+  const [refillDraft, setRefillDraft] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [authTab, setAuthTab] = useState('login')
+  const [loginForm, setLoginForm] = useState(loginSeed)
+  const [registerForm, setRegisterForm] = useState({ name: '', email: '', password: '' })
+  const [brandProfile, setBrandProfile] = useState(brandProfileSeed)
+  const [settingsState, setSettingsState] = useState(settingsSeed)
+  const [localAssetsByTask, setLocalAssetsByTask] = useState({})
 
-  const taskDraft = useMemo(() => buildTaskDraft(taskForm), [taskForm])
+  useEffect(() => {
+    localStorage.setItem('fangzhou_shell_token', token)
+  }, [token])
 
-  const normalizedTasks = useMemo(
-    () =>
-      dashboard.tasks.map((task) => ({
-        ...task,
-        display: summarizeTask(task, taskDraft),
-      })),
-    [dashboard.tasks, taskDraft],
-  )
+  async function loadBootstrap() {
+    const data = await apiFetch('/api/bootstrap')
+    setBootstrap(data)
+    setLoginForm((prev) => ({
+      username: prev.username || data.demoCredentials?.username || loginSeed.username,
+      password: prev.password || data.demoCredentials?.password || loginSeed.password,
+    }))
+    if (!brandId && data.brands?.length) setBrandId(data.brands[0].id)
+  }
 
-  const filteredTasks = useMemo(() => {
-    return normalizedTasks.filter((task) => {
-      const matchFilter = taskFilter === '全部' || task.display.status === taskFilter
-      const keyword = `${task.display.title} ${task.display.meta} ${task.instruction || ''}`.toLowerCase()
-      const matchQuery = !taskQuery.trim() || keyword.includes(taskQuery.trim().toLowerCase())
-      return matchFilter && matchQuery
-    })
-  }, [normalizedTasks, taskFilter, taskQuery])
-
-  const currentTask = useMemo(
-    () =>
-      filteredTasks.find((task) => task.id === currentTaskId) ??
-      normalizedTasks.find((task) => task.id === currentTaskId) ??
-      filteredTasks[0] ??
-      normalizedTasks[0] ??
-      null,
-    [filteredTasks, normalizedTasks, currentTaskId],
-  )
-
-  const activeTaskSummary = useMemo(() => summarizeTask(currentTask, taskDraft), [currentTask, taskDraft])
-  const leads = useMemo(
-    () => hydrateLeadRows(currentTask, dashboard.leadsByTask?.[currentTask?.id] || [], taskDraft),
-    [currentTask, dashboard.leadsByTask, taskDraft],
-  )
-  const taskReminders = useMemo(
-    () =>
-      leads
-        .filter((lead) => lead.reminderAt)
-        .slice()
-        .sort((left, right) => String(left.reminderAt).localeCompare(String(right.reminderAt))),
-    [leads],
-  )
-  const funnel = useMemo(() => buildFunnel(leads), [leads])
-  const timeline = useMemo(() => buildTaskTimeline(currentTask, taskDraft, funnel), [currentTask, taskDraft, funnel])
-
-  const searchedLeads = useMemo(() => {
-    return leads.filter((lead) => {
-      const keyword = `${lead.name} ${lead.platform} ${lead.contact} ${lead.status} ${lead.handling}`.toLowerCase()
-      return !leadQuery.trim() || keyword.includes(leadQuery.trim().toLowerCase())
-    })
-  }, [leads, leadQuery])
-
-  const filteredLeads = useMemo(() => {
-    if (stageFilter === '全部') return searchedLeads
-    return searchedLeads.filter((lead) => lead.status === stageFilter)
-  }, [searchedLeads, stageFilter])
-
-  const selectedLead = useMemo(
-    () =>
-      filteredLeads.find((lead) => lead.id === selectedLeadId) ??
-      leads.find((lead) => lead.id === selectedLeadId) ??
-      filteredLeads[0] ??
-      leads[0] ??
-      null,
-    [filteredLeads, leads, selectedLeadId],
-  )
-  const taskTodos = useMemo(() => buildTaskTodo(selectedLead, funnel, taskReminders), [selectedLead, funnel, taskReminders])
-
-  const inboxLeads = useMemo(() => {
-    return leads
-      .filter((lead) => ['已回复', '洽谈中', '待人工接管'].includes(lead.status))
-      .filter((lead) => {
-        const matchStatus =
-          conversationFilter === '全部' ||
-          (conversationFilter === '待处理' && ['已回复', '洽谈中'].includes(lead.status)) ||
-          (conversationFilter === '待接管' && lead.status === '待人工接管') ||
-          (conversationFilter === '已回复' && lead.status === '已回复')
-
-        const keyword = `${lead.name} ${lead.platform} ${lead.intent} ${lead.status}`.toLowerCase()
-        const matchQuery = !conversationQuery.trim() || keyword.includes(conversationQuery.trim().toLowerCase())
-        return matchStatus && matchQuery
-      })
-  }, [leads, conversationFilter, conversationQuery])
-
-  const messages = useMemo(() => selectedLead?.conversation || [], [selectedLead])
-
-  const suggestions = useMemo(() => aiSuggestions(selectedLead, taskDraft), [selectedLead, taskDraft])
-
-  async function refreshDashboard(activeToken, nextBrandId) {
-    const board = await apiFetch(`/api/dashboard?brandId=${nextBrandId}`, {}, activeToken)
-    setDashboard(board)
+  async function loadSession(authToken, nextBrandId = brandId) {
+    const me = await apiFetch('/api/me', {}, authToken)
+    setCurrentUser(me.user)
+    const resolvedBrandId = nextBrandId || me.brands?.[0]?.id || ''
+    if (resolvedBrandId) setBrandId(resolvedBrandId)
+    const dash = await apiFetch(`/api/dashboard?brandId=${resolvedBrandId}`, {}, authToken)
+    setDashboard(dash)
+    setActiveTaskId(dash.activeTaskId || dash.tasks?.[0]?.id || '')
   }
 
   useEffect(() => {
-    apiFetch('/api/bootstrap')
-      .then((data) => {
-        setBootstrap(data)
-        setBrandId(data.brands[0]?.id || '')
-      })
-      .catch((requestError) => setError(requestError.message))
+    loadBootstrap().catch((loadError) => setError(loadError.message))
   }, [])
 
   useEffect(() => {
-    if (!token) return
-    apiFetch('/api/me', {}, token)
-      .then((me) => {
-        setCurrentUser(me.user)
-        return refreshDashboard(token, brandId || me.brands[0]?.id || '')
-      })
-      .catch((requestError) => setError(requestError.message))
+    if (!token || !brandId) return
+    loadSession(token, brandId).catch((loadError) => {
+      setError(loadError.message)
+      setToken('')
+      setCurrentUser(null)
+    })
   }, [token, brandId])
 
   useEffect(() => {
-    if (currentTask) {
-      setCurrentTaskId(currentTask.id)
-      setStageFilter('全部')
+    if (!dashboard.tasks.length) return
+    setLocalAssetsByTask((prev) => {
+      let changed = false
+      const next = { ...prev }
+      dashboard.tasks.forEach((task) => {
+        const realAssets = dashboard.leadsByTask?.[task.id] || []
+        if (realAssets.length === 0 && !next[task.id]) {
+          next[task.id] = buildMockAssets(task)
+          changed = true
+        }
+      })
+      return changed ? next : prev
+    })
+  }, [dashboard])
+
+  const currentBrand = useMemo(
+    () => bootstrap.brands.find((item) => item.id === brandId) || bootstrap.brands[0] || null,
+    [bootstrap.brands, brandId],
+  )
+
+  const tasks = useMemo(() => dashboard.tasks || [], [dashboard.tasks])
+
+  const visibleTasks = useMemo(() => {
+    if (!taskSearch.trim()) return tasks
+    const query = taskSearch.trim().toLowerCase()
+    return tasks.filter((task) => {
+      const summary = parseInstruction(task)
+      return [summary.title, summary.product, summary.market, summary.direction].join(' ').toLowerCase().includes(query)
+    })
+  }, [tasks, taskSearch])
+
+  const activeTask = useMemo(
+    () => tasks.find((task) => task.id === activeTaskId) || visibleTasks[0] || null,
+    [tasks, activeTaskId, visibleTasks],
+  )
+
+  useEffect(() => {
+    if (!activeTask && !visibleTasks.length) return
+    if (!activeTaskId && activeTask?.id) setActiveTaskId(activeTask.id)
+  }, [activeTask, activeTaskId, visibleTasks])
+
+  const taskAssetsMap = useMemo(() => {
+    const result = {}
+    tasks.forEach((task) => {
+      const realAssets = dashboard.leadsByTask?.[task.id] || []
+      result[task.id] = realAssets.length > 0 ? realAssets : (localAssetsByTask[task.id] || [])
+    })
+    return result
+  }, [dashboard.leadsByTask, localAssetsByTask, tasks])
+
+  const activeAssets = useMemo(
+    () => (activeTask ? taskAssetsMap[activeTask.id] || [] : []),
+    [activeTask, taskAssetsMap],
+  )
+
+  const filteredAssets = useMemo(() => {
+    if (!assetSearch.trim()) return activeAssets
+    const query = assetSearch.trim().toLowerCase()
+    return activeAssets.filter((asset) =>
+      [asset.name, asset.type, asset.platform, asset.contact, asset.status, asset.handling].join(' ').toLowerCase().includes(query),
+    )
+  }, [activeAssets, assetSearch])
+
+  useEffect(() => {
+    if (!filteredAssets.length) {
+      setSelectedAssetId('')
+      return
     }
-  }, [currentTask?.id])
+    if (!selectedAssetId || !filteredAssets.some((asset) => asset.id === selectedAssetId)) {
+      setSelectedAssetId(filteredAssets[0].id)
+    }
+  }, [filteredAssets, selectedAssetId])
 
-  useEffect(() => {
-    if (selectedLead) setSelectedLeadId(selectedLead.id)
-  }, [selectedLead?.id])
+  const selectedAsset = useMemo(
+    () => activeAssets.find((asset) => asset.id === selectedAssetId) || filteredAssets[0] || null,
+    [activeAssets, filteredAssets, selectedAssetId],
+  )
 
-  useEffect(() => {
-    setSelectedLeadIds((prev) => prev.filter((id) => leads.some((lead) => lead.id === id)))
-  }, [leads])
+  const allConversationAssets = useMemo(
+    () =>
+      tasks.flatMap((task) =>
+        (taskAssetsMap[task.id] || []).map((asset) => ({
+          ...asset,
+          taskTitle: parseInstruction(task).title,
+        })),
+      ),
+    [taskAssetsMap, tasks],
+  )
 
-  useEffect(() => {
-    setLeadReminderAt(toDateTimeLocalValue(selectedLead?.reminderAt))
-    setLeadReminderNote(selectedLead?.reminderNote || '')
-  }, [selectedLead?.id, selectedLead?.reminderAt, selectedLead?.reminderNote])
+  const inboxAssets = useMemo(() => {
+    if (!conversationSearch.trim()) return allConversationAssets
+    const query = conversationSearch.trim().toLowerCase()
+    return allConversationAssets.filter((asset) =>
+      [asset.name, asset.platform, asset.status, asset.handling, asset.lastAction].join(' ').toLowerCase().includes(query),
+    )
+  }, [allConversationAssets, conversationSearch])
 
-  async function handleLogin(event) {
-    event.preventDefault()
-    setLoggingIn(true)
+  const selectedConversationAsset = useMemo(() => {
+    if (pageId === 'conversations') {
+      return inboxAssets.find((asset) => asset.id === selectedAssetId) || inboxAssets[0] || null
+    }
+    return selectedAsset
+  }, [inboxAssets, pageId, selectedAsset, selectedAssetId])
+
+  const stageCounts = useMemo(() => assetStageCounts(activeAssets), [activeAssets])
+  const promptDraft = useMemo(() => promptBlueprint(taskPrompt), [taskPrompt])
+  const activeTaskSummary = useMemo(() => (activeTask ? parseInstruction(activeTask) : null), [activeTask])
+  const selectedSuggestions = useMemo(() => buildSuggestionSet(selectedConversationAsset), [selectedConversationAsset])
+
+  function updateLocalAsset(taskId, assetId, updater) {
+    setLocalAssetsByTask((prev) => ({
+      ...prev,
+      [taskId]: (prev[taskId] || []).map((asset) => (asset.id === assetId ? updater(asset) : asset)),
+    }))
+  }
+
+  async function handleLogin() {
+    setLoading(true)
+    setError('')
     try {
-      const response = await apiFetch('/api/login', {
+      const payload = await apiFetch('/api/login', {
         method: 'POST',
         body: JSON.stringify(loginForm),
       })
-      localStorage.setItem('fz_workbench_token', response.token)
-      setToken(response.token)
-      setCurrentUser(response.user)
-    } catch (requestError) {
-      setError(requestError.message)
+      setToken(payload.token)
+      setCurrentUser(payload.user)
+    } catch (loginError) {
+      setError(loginError.message)
     } finally {
-      setLoggingIn(false)
+      setLoading(false)
     }
   }
 
-  async function handleRegister(event) {
-    event.preventDefault()
-    setRegistering(true)
+  async function handleRegister() {
+    setLoading(true)
+    setError('')
     try {
-      const response = await apiFetch('/api/register', {
+      const payload = await apiFetch('/api/register', {
         method: 'POST',
-        body: JSON.stringify(registerForm),
+        body: JSON.stringify({
+          name: registerForm.name,
+          email: registerForm.email,
+          password: registerForm.password,
+        }),
       })
-      localStorage.setItem('fz_workbench_token', response.token)
-      setToken(response.token)
-      setCurrentUser(response.user)
-    } catch (requestError) {
-      setError(requestError.message)
+      setToken(payload.token)
+      setCurrentUser(payload.user)
+    } catch (registerError) {
+      setError(registerError.message)
     } finally {
-      setRegistering(false)
+      setLoading(false)
     }
   }
 
   function handleLogout() {
-    localStorage.removeItem('fz_workbench_token')
     setToken('')
     setCurrentUser(null)
     setDashboard(emptyDashboard)
+    setActiveTaskId('')
+    setSelectedAssetId('')
+    setPageId('overview')
+  }
+
+  async function reloadDashboard(nextTaskId = activeTaskId) {
+    const dash = await apiFetch(`/api/dashboard?brandId=${brandId}`, {}, token)
+    setDashboard(dash)
+    setActiveTaskId(nextTaskId || dash.activeTaskId || dash.tasks?.[0]?.id || '')
   }
 
   async function createTask() {
-    if (!token || !brandId) return
-    setCreatingTask(true)
-    try {
-      const instruction = taskPrompt.trim() || buildTaskInstruction(taskForm)
-      const response = await apiFetch(
-        '/api/tasks',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            brandId,
-            moduleId: 'traffic-acquisition',
-            instruction,
-          }),
-        },
-        token,
-      )
-      setCurrentTaskId(response.task.id)
-      await refreshDashboard(token, brandId)
-      setPageId('execute')
-    } catch (requestError) {
-      setError(requestError.message)
-    } finally {
-      setCreatingTask(false)
-    }
-  }
-
-  async function startExecution() {
-    if (!currentTask || !token) return
-    await apiFetch(`/api/tasks/${currentTask.id}/submit`, { method: 'POST', body: JSON.stringify({}) }, token)
-    await refreshDashboard(token, brandId)
-    setPageId('execute')
-  }
-
-  function applySuggestion(text) {
-    setReplyDraft(text)
-  }
-
-  async function sendReply(prefilledText = '') {
-    if (!selectedLead) return
-    const text = (prefilledText || replyDraft).trim()
-    if (!text || !token) return
-
-    setSendingReply(true)
-    try {
-      await apiFetch(
-        `/api/leads/${selectedLead.id}/messages`,
-        {
-          method: 'POST',
-          body: JSON.stringify({ text }),
-        },
-        token,
-      )
-      setReplyDraft('')
-      await refreshDashboard(token, brandId)
-    } catch (requestError) {
-      setError(requestError.message)
-    } finally {
-      setSendingReply(false)
-    }
-  }
-
-  async function updateLead(values) {
-    if (!selectedLead || !token) return
-    setUpdatingLead(true)
-    try {
-      await apiFetch(
-        `/api/leads/${selectedLead.id}`,
-        {
-          method: 'PATCH',
-          body: JSON.stringify(values),
-        },
-        token,
-      )
-      await refreshDashboard(token, brandId)
-    } catch (requestError) {
-      setError(requestError.message)
-    } finally {
-      setUpdatingLead(false)
-    }
-  }
-
-  async function saveLeadReminder(values) {
-    await updateLead(values)
-  }
-
-  function toggleLeadSelection(leadId) {
-    setSelectedLeadIds((prev) => (prev.includes(leadId) ? prev.filter((id) => id !== leadId) : [...prev, leadId]))
-  }
-
-  function toggleSelectAllFilteredLeads() {
-    const ids = filteredLeads.map((lead) => lead.id)
-    const allSelected = ids.length > 0 && ids.every((id) => selectedLeadIds.includes(id))
-    if (allSelected) {
-      setSelectedLeadIds((prev) => prev.filter((id) => !ids.includes(id)))
+    if (!taskPrompt.trim()) {
+      setError('请先输入任务目标。')
       return
     }
-    setSelectedLeadIds((prev) => [...new Set([...prev, ...ids])])
-  }
 
-  async function applyBulkUpdate() {
-    if (!token || selectedLeadIds.length === 0) return
-    setUpdatingLead(true)
+    setLoading(true)
+    setError('')
     try {
-      await apiFetch(
-        '/api/leads/bulk-update',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            ids: selectedLeadIds,
-            status: bulkStatus || undefined,
-            handling: bulkHandling || undefined,
-            nextAction: bulkNextAction || undefined,
-            reminderAt: bulkReminderAt ? new Date(bulkReminderAt).toISOString() : undefined,
-            reminderNote: bulkReminderNote || undefined,
-          }),
-        },
-        token,
-      )
-      setSelectedLeadIds([])
-      setBulkStatus('')
-      setBulkHandling('')
-      setBulkNextAction('')
-      setBulkReminderAt('')
-      setBulkReminderNote('')
-      await refreshDashboard(token, brandId)
-    } catch (requestError) {
-      setError(requestError.message)
+      const payload = await apiFetch('/api/tasks', {
+        method: 'POST',
+        body: JSON.stringify({
+          brandId,
+          moduleId: 'traffic-acquisition',
+          instruction: taskPrompt.trim(),
+        }),
+      }, token)
+      await reloadDashboard(payload.task.id)
+      setPageId('tasks')
+      setRefillDraft('')
+    } catch (taskError) {
+      setError(taskError.message)
     } finally {
-      setUpdatingLead(false)
+      setLoading(false)
     }
   }
 
-  function renderDetailPanel() {
-    if (pageId === 'conversation' && selectedLead) {
-      return (
-        <>
-          <section className="detail-card">
-            <p className="section-label">当前会话</p>
-            <h3>{selectedLead.name}</h3>
-            <div className="detail-list">
-              <article><span>处理方式</span><strong>{selectedLead.handling}</strong></article>
-              <article><span>当前状态</span><strong>{selectedLead.status}</strong></article>
-              <article><span>对方意图</span><strong>{selectedLead.intent}</strong></article>
-              <article><span>风险提醒</span><strong>{selectedLead.risk}</strong></article>
-              <article><span>跟进提醒</span><strong>{selectedLead.reminderAt ? formatTime(selectedLead.reminderAt) : '未设置'}</strong></article>
-            </div>
-          </section>
+  async function sendToExternalAgent() {
+    if (!activeTask) return
+    setLoading(true)
+    setError('')
+    try {
+      await apiFetch(`/api/tasks/${activeTask.id}/submit`, { method: 'POST' }, token)
+      await reloadDashboard(activeTask.id)
+    } catch (submitError) {
+      setError(submitError.message)
+    } finally {
+      setLoading(false)
+    }
+  }
 
-          <section className="detail-card">
-            <p className="section-label">AI 辅助回复</p>
-            <div className="detail-note">
-              <strong>推荐动作</strong>
-              <p>{selectedLead.nextAction}</p>
-            </div>
-            <div className="detail-note">
-              <strong>更新线索状态</strong>
-              <div className="tag-row">
-                {leadStatuses.map((status) => (
-                  <button key={status} type="button" className={selectedLead.status === status ? 'filter-chip active' : 'filter-chip'} onClick={() => updateLead({ status })} disabled={updatingLead}>
-                    {status}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="detail-note">
-              <strong>更新处理方式</strong>
-              <div className="tag-row">
-                {handlingModes.map((handling) => (
-                  <button key={handling} type="button" className={selectedLead.handling === handling ? 'filter-chip active' : 'filter-chip'} onClick={() => updateLead({ handling })} disabled={updatingLead}>
-                    {handling}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="detail-note">
-              <strong>跟进提醒</strong>
-              <div className="tag-row">
-                <button type="button" className="filter-chip" onClick={() => saveLeadReminder({ reminderAt: makeReminderIso(24), reminderNote: '明天跟进' })} disabled={updatingLead}>
-                  明天跟进
-                </button>
-                <button type="button" className="filter-chip" onClick={() => saveLeadReminder({ reminderAt: makeReminderIso(48), reminderNote: '48 小时后提醒' })} disabled={updatingLead}>
-                  48 小时后提醒
-                </button>
-                <button type="button" className="filter-chip" onClick={() => saveLeadReminder({ reminderAt: '', reminderNote: '' })} disabled={updatingLead}>
-                  清除提醒
-                </button>
-              </div>
-              <div className="detail-form">
-                <label>
-                  <span>自定义提醒时间</span>
-                  <input type="datetime-local" value={leadReminderAt} onChange={(event) => setLeadReminderAt(event.target.value)} />
-                </label>
-                <label>
-                  <span>提醒备注</span>
-                  <input value={leadReminderNote} onChange={(event) => setLeadReminderNote(event.target.value)} placeholder="例如：明天确认报价回复" />
-                </label>
-              </div>
-              <div className="panel-actions">
-                <button type="button" className="chip-button" onClick={() => saveLeadReminder({ reminderAt: leadReminderAt ? new Date(leadReminderAt).toISOString() : '', reminderNote: leadReminderNote })} disabled={updatingLead}>
-                  保存提醒
-                </button>
-              </div>
-            </div>
-            {suggestions.map((suggestion) => (
-              <article key={suggestion.label} className="suggestion-card">
-                <div className="suggestion-head">
-                  <strong>{suggestion.label}</strong>
-                  <button type="button" className="text-button" onClick={() => applySuggestion(suggestion.text)}>
-                    放入输入框
-                  </button>
-                </div>
-                <p>{suggestion.text}</p>
-                <span>{suggestion.reason}</span>
-              </article>
-            ))}
-          </section>
-        </>
-      )
+  async function markWaitingRefill() {
+    if (!activeTask) return
+    setLoading(true)
+    setError('')
+    try {
+      await apiFetch(`/api/tasks/${activeTask.id}/mark-refill`, { method: 'POST' }, token)
+      await reloadDashboard(activeTask.id)
+    } catch (markError) {
+      setError(markError.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function submitRefill() {
+    if (!activeTask || !refillDraft.trim()) {
+      setError('请先粘贴外部 Agent 的执行结果。')
+      return
     }
 
-    if (pageId === 'execute' && selectedLead) {
-      return (
-        <>
-          <section className="detail-card">
-            <p className="section-label">资产详情</p>
-            <h3>{selectedLead.name}</h3>
-            <div className="detail-list">
-              <article><span>平台</span><strong>{selectedLead.platform}</strong></article>
-              <article><span>粉丝量</span><strong>{selectedLead.followers}</strong></article>
-              <article><span>匹配度</span><strong>{selectedLead.fitScore}</strong></article>
-              <article><span>触达方式</span><strong>{selectedLead.contact}</strong></article>
-              <article><span>处理方式</span><strong>{selectedLead.handling}</strong></article>
-              <article><span>下一步</span><strong>{selectedLead.nextAction}</strong></article>
+    setLoading(true)
+    setError('')
+    try {
+      await apiFetch(`/api/tasks/${activeTask.id}/refill`, {
+        method: 'POST',
+        body: JSON.stringify({ rawText: refillDraft }),
+      }, token)
+      await reloadDashboard(activeTask.id)
+      setRefillDraft('')
+    } catch (refillError) {
+      setError(refillError.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function sendReply() {
+    if (!selectedConversationAsset || !replyDraft.trim()) return
+
+    setLoading(true)
+    setError('')
+    try {
+      const hasRealAssets = (dashboard.leadsByTask?.[selectedConversationAsset.taskId] || []).length > 0
+      if (hasRealAssets) {
+        await apiFetch(
+          `/api/leads/${selectedConversationAsset.id}/messages`,
+          {
+            method: 'POST',
+            body: JSON.stringify({ text: replyDraft.trim() }),
+          },
+          token,
+        )
+        await reloadDashboard(selectedConversationAsset.taskId)
+      } else {
+        updateLocalAsset(selectedConversationAsset.taskId, selectedConversationAsset.id, (asset) => ({
+          ...asset,
+          status: '洽谈中',
+          lastAction: '已发送回复',
+          nextAction: '等待对方下一轮反馈',
+          conversation: [...asset.conversation, { role: 'agent', text: replyDraft.trim() }],
+        }))
+      }
+      setReplyDraft('')
+    } catch (replyError) {
+      setError(replyError.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function renderOverviewPage() {
+    return (
+      <div className="page-stack">
+        <section className="hero-band">
+          <div className="hero-copy">
+            <p className="eyebrow">External Agent Shell</p>
+            <h1>方洲AI 外联业务壳层</h1>
+            <p>
+              不是再做一个 Agent，而是把外部 Agent 包进你的跨境业务流程里。
+              所有任务、会话、摘要、结果和合作关系，统一沉淀在云端。
+            </p>
+          </div>
+          <div className="hero-grid">
+            <article>
+              <span>云端记忆层</span>
+              <strong>会话 / 约束 / 资产统一沉淀</strong>
+            </article>
+            <article>
+              <span>外部执行层</span>
+              <strong>OpenCloud / Codex / 人工都能接</strong>
+            </article>
+            <article>
+              <span>业务回填层</span>
+              <strong>回填后自动生成摘要与下一步动作</strong>
+            </article>
+          </div>
+        </section>
+
+        <section className="metric-strip">
+          <article>
+            <span>执行中任务</span>
+            <strong>{dashboard.overview.todayTaskCount}</strong>
+          </article>
+          <article>
+            <span>外联推进中</span>
+            <strong>{dashboard.overview.outreachInProgress}</strong>
+          </article>
+          <article>
+            <span>已沉淀资产</span>
+            <strong>{dashboard.dataCenter.influencerPool + dashboard.dataCenter.dealSitePool + dashboard.dataCenter.mediaPool}</strong>
+          </article>
+          <article>
+            <span>待回填</span>
+            <strong>{dashboard.overview.pendingRefillCount}</strong>
+          </article>
+        </section>
+
+        <div className="two-column">
+          <section className="surface">
+            <div className="section-head">
+              <div>
+                <p className="eyebrow">系统价值</p>
+                <h2>为什么不用直接 Agent，而要用这层壳</h2>
+              </div>
             </div>
-            <div className="detail-note">
-              <strong>备注</strong>
-              <p>{selectedLead.notes}</p>
+            <div className="value-grid">
+              <article>
+                <strong>统一上下文</strong>
+                <p>不用每次重新告诉 Agent 你的品牌、SKU、合作边界和历史沟通。</p>
+              </article>
+              <article>
+                <strong>统一回填</strong>
+                <p>所有执行结果都回到同一个任务和资产池里，而不是散落在不同窗口。</p>
+              </article>
+              <article>
+                <strong>统一资产沉淀</strong>
+                <p>达人、媒体、Deal 站、联盟客都会沉淀成品牌自己的外联资产。</p>
+              </article>
+              <article>
+                <strong>统一下一步动作</strong>
+                <p>系统自动给出后续建议、提醒和接管判断，不让沟通断掉。</p>
+              </article>
             </div>
           </section>
 
-          <section className="detail-card">
-            <p className="section-label">任务进展板</p>
-            <div className="detail-note">
-              <strong>当前进度</strong>
-              <p>{`已触达 ${funnel.已触达 + funnel.已回复 + funnel.洽谈中 + funnel.已确认合作} / 已回复 ${funnel.已回复} / 洽谈中 ${funnel.洽谈中}`}</p>
-            </div>
-            <div className="detail-note">
-              <strong>当前待办</strong>
-              <div className="todo-list">
-                {taskTodos.map((todo) => (
-                  <p key={todo}>{todo}</p>
-                ))}
-              </div>
-            </div>
-            <div className="detail-note">
-              <strong>最近提醒</strong>
-              <div className="todo-list">
-                {taskReminders.slice(0, 4).map((lead) => (
-                  <p key={lead.id}>{`${lead.name} ｜ ${formatTime(lead.reminderAt)} ｜ ${lead.reminderNote || lead.nextAction}`}</p>
-                ))}
-                {taskReminders.length === 0 ? <p>当前任务还没有设置提醒。</p> : null}
+          <section className="surface">
+            <div className="section-head">
+              <div>
+                <p className="eyebrow">最近结果</p>
+                <h2>已经跑出来的交付</h2>
               </div>
             </div>
             <div className="timeline-list">
-              {timeline.map((item, index) => (
-                <article key={`${item.time}-${item.title}-${index}`} className="timeline-item">
-                  <span>{item.time}</span>
-                  <strong>{item.title}</strong>
-                  <p>{item.detail}</p>
-                </article>
-              ))}
+              {dashboard.recentResults.length ? (
+                dashboard.recentResults.map((item) => (
+                  <article key={item.id} className="timeline-row">
+                    <span>{shortDate(item.completedAt)}</span>
+                    <strong>{parseInstruction({ instruction: item.instruction }).title}</strong>
+                    <p>{item.summary || '已完成回填。'}</p>
+                  </article>
+                ))
+              ) : (
+                <article className="empty-state">还没有最近结果，创建一个新任务后这里会展示回填摘要。</article>
+              )}
             </div>
           </section>
-        </>
-      )
-    }
-
-    return (
-      <>
-        <section className="detail-card">
-          <p className="section-label">AI 副驾驶</p>
-          <h3>{taskDraft.taskName}</h3>
-          <div className="detail-list">
-            <article><span>产品</span><strong>{taskDraft.productName}</strong></article>
-            <article><span>市场</span><strong>{taskDraft.market}</strong></article>
-            <article><span>行业方向</span><strong>{taskDraft.industryDirection}</strong></article>
-            <article><span>目标平台</span><strong>{taskDraft.platforms.join(' / ') || '未选择'}</strong></article>
-            <article><span>触达方式</span><strong>{taskDraft.outreachMethods.join(' / ') || '未选择'}</strong></article>
-            <article><span>目标触达</span><strong>{taskDraft.targetReach} 位达人</strong></article>
-          </div>
-        </section>
-
-        <section className="detail-card">
-          <p className="section-label">合作约束</p>
-          <div className="tag-row">
-            {taskDraft.constraints.map((item) => (
-              <span key={item} className="soft-tag">
-                {item}
-              </span>
-            ))}
-          </div>
-          <div className="detail-note">
-            <strong>执行方案</strong>
-            <textarea className="plan-box" readOnly value={buildTaskInstruction(taskForm)} />
-          </div>
-        </section>
-      </>
-    )
-  }
-
-  if (!currentUser) {
-    return (
-      <div className="login-shell">
-        <div className="login-hero">
-          <p className="eyebrow">Outreach OS</p>
-          <h1>方洲AI</h1>
-          <p>帮跨境品牌把外联沟通、合作推进和资产沉淀统一到一个操作台里。</p>
-          <p className="helper-text">{bootstrap.authMode === 'supabase' ? '当前已启用正式账号体系' : '当前还是 demo 登录，接上 Supabase Auth 后可启用正式账号'}</p>
-        </div>
-        <div className="login-panel">
-          <div className="filter-row">
-            <button type="button" className={authTab === 'login' ? 'filter-chip active' : 'filter-chip'} onClick={() => setAuthTab('login')}>
-              登录
-            </button>
-            <button type="button" className={authTab === 'register' ? 'filter-chip active' : 'filter-chip'} onClick={() => setAuthTab('register')}>
-              注册
-            </button>
-          </div>
-
-          {authTab === 'login' ? (
-            <form onSubmit={handleLogin} className="auth-form">
-              <label>
-                <span>邮箱</span>
-                <input value={loginForm.username} onChange={(event) => setLoginForm((prev) => ({ ...prev, username: event.target.value }))} />
-              </label>
-              <label>
-                <span>密码</span>
-                <input type="password" value={loginForm.password} onChange={(event) => setLoginForm((prev) => ({ ...prev, password: event.target.value }))} />
-              </label>
-              <button type="submit" className="primary-button" disabled={loggingIn}>
-                {loggingIn ? '登录中...' : '进入系统'}
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleRegister} className="auth-form">
-              <label>
-                <span>姓名</span>
-                <input value={registerForm.name} onChange={(event) => setRegisterForm((prev) => ({ ...prev, name: event.target.value }))} />
-              </label>
-              <label>
-                <span>邮箱</span>
-                <input value={registerForm.email} onChange={(event) => setRegisterForm((prev) => ({ ...prev, email: event.target.value }))} />
-              </label>
-              <label>
-                <span>密码</span>
-                <input type="password" value={registerForm.password} onChange={(event) => setRegisterForm((prev) => ({ ...prev, password: event.target.value }))} />
-              </label>
-              {bootstrap.authMode !== 'supabase' ? <p className="helper-text">先把 `SUPABASE_URL / SERVICE_ROLE_KEY / ANON_KEY` 配好，注册入口才会生效。</p> : null}
-              <button type="submit" className="primary-button" disabled={registering || bootstrap.authMode !== 'supabase'}>
-                {registering ? '注册中...' : '创建账号'}
-              </button>
-            </form>
-          )}
         </div>
       </div>
     )
   }
 
-  return (
-    <div className="app-shell">
-      <header className="workspace-header">
-        <div className="brand-inline">
-          <div className="brand-stack">
-            <strong>方洲AI</strong>
-            <span>外联与资产系统</span>
+  function renderTasksPage() {
+    return (
+      <div className="page-stack">
+        <div className="two-column wide-right">
+          <section className="surface">
+            <div className="section-head">
+              <div>
+                <p className="eyebrow">创建任务</p>
+                <h2>先告诉系统你要推进什么合作</h2>
+              </div>
+            </div>
+
+            <label className="field">
+              <span>自然语言任务输入</span>
+              <textarea
+                className="prompt-box"
+                value={taskPrompt}
+                onChange={(event) => setTaskPrompt(event.target.value)}
+                placeholder="例如：帮我创建一个美国健身类 TikTok 达人首轮触达任务，目标 50 人，佣金不超过 14%。"
+              />
+            </label>
+
+            <div className="chip-row">
+              {quickExamples.map((item) => (
+                <button key={item} type="button" className="soft-chip" onClick={() => setTaskPrompt(item)}>
+                  {item}
+                </button>
+              ))}
+            </div>
+
+            <div className="draft-grid">
+              <article>
+                <span>对象类型</span>
+                <strong>{promptDraft.objectType}</strong>
+              </article>
+              <article>
+                <span>建议工作流</span>
+                <strong>{promptDraft.workflow}</strong>
+              </article>
+              <article>
+                <span>目标平台</span>
+                <strong>{promptDraft.targets.join(' / ')}</strong>
+              </article>
+            </div>
+
+            <div className="surface-note">
+              <strong>这层壳会自动附带的上下文</strong>
+              <p>{promptDraft.memory.join(' · ')}</p>
+            </div>
+
+            <div className="action-row">
+              <button type="button" className="primary-button" onClick={createTask} disabled={loading}>
+                {loading ? '处理中...' : '创建任务'}
+              </button>
+            </div>
+          </section>
+
+          <section className="surface">
+            <div className="section-head">
+              <div>
+                <p className="eyebrow">任务编排台</p>
+                <h2>{activeTaskSummary?.title || '还没有选中任务'}</h2>
+              </div>
+              <span className="status-pill">{normalizeTaskStatus(activeTask?.status)}</span>
+            </div>
+
+            {activeTask ? (
+              <div className="task-orchestration">
+                <div className="meta-grid">
+                  <article>
+                    <span>产品 / SKU</span>
+                    <strong>{activeTaskSummary.product}</strong>
+                  </article>
+                  <article>
+                    <span>市场 / 方向</span>
+                    <strong>{`${activeTaskSummary.market} / ${activeTaskSummary.direction}`}</strong>
+                  </article>
+                  <article>
+                    <span>目标平台</span>
+                    <strong>{activeTaskSummary.platforms}</strong>
+                  </article>
+                  <article>
+                    <span>触达方式</span>
+                    <strong>{activeTaskSummary.outreach}</strong>
+                  </article>
+                </div>
+
+                <section className="mini-surface">
+                  <div className="section-head compact">
+                    <div>
+                      <p className="eyebrow">执行说明</p>
+                      <h3>系统给外部 Agent 的任务包</h3>
+                    </div>
+                  </div>
+                  <div className="package-text">
+                    <strong>{activeTask.executionPackage?.title || '执行方案'}</strong>
+                    <p>{activeTask.executionPackage?.externalStatus || '尚未发送到外部执行端'}</p>
+                    <pre>{activeTask.executionPackage?.content || '暂无执行方案。'}</pre>
+                  </div>
+                </section>
+
+                <section className="mini-surface">
+                  <div className="section-head compact">
+                    <div>
+                      <p className="eyebrow">回填结果</p>
+                      <h3>外部 Agent 跑完之后贴回这里</h3>
+                    </div>
+                  </div>
+                  <textarea
+                    className="prompt-box compact"
+                    value={refillDraft}
+                    onChange={(event) => setRefillDraft(event.target.value)}
+                    placeholder="把外部 Agent 的执行摘要、名单证据和下一步动作粘贴进来。"
+                  />
+                </section>
+
+                <div className="action-row split">
+                  <button type="button" className="secondary-button" onClick={sendToExternalAgent} disabled={loading}>
+                    提交到外部 Agent
+                  </button>
+                  <button type="button" className="secondary-button" onClick={markWaitingRefill} disabled={loading}>
+                    标记待回填
+                  </button>
+                  <button type="button" className="primary-button" onClick={submitRefill} disabled={loading}>
+                    回填结果
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="empty-state">先创建一个任务，这里会生成执行说明、发送动作和回填入口。</div>
+            )}
+          </section>
+        </div>
+      </div>
+    )
+  }
+
+  function renderAssetsPage() {
+    return (
+      <div className="page-stack">
+        <section className="surface">
+          <div className="section-head">
+            <div>
+              <p className="eyebrow">品牌资产池</p>
+              <h2>{activeTaskSummary?.title || '当前任务资产'}</h2>
+            </div>
+            <input
+              className="search-input"
+              value={assetSearch}
+              onChange={(event) => setAssetSearch(event.target.value)}
+              placeholder="搜索对象、平台、状态、触达方式"
+            />
+          </div>
+
+          <div className="funnel-strip">
+            {Object.entries(stageCounts).map(([label, value]) => (
+              <article key={label}>
+                <span>{label}</span>
+                <strong>{value}</strong>
+              </article>
+            ))}
+          </div>
+
+          <div className="asset-table">
+            <div className="asset-table-head">
+              <span>对象</span>
+              <span>类型</span>
+              <span>平台</span>
+              <span>匹配度</span>
+              <span>状态</span>
+              <span>处理方式</span>
+              <span>下一步</span>
+            </div>
+            <div className="asset-table-body">
+              {filteredAssets.length ? (
+                filteredAssets.map((asset) => (
+                  <button
+                    key={asset.id}
+                    type="button"
+                    className={asset.id === selectedAssetId ? 'asset-row active' : 'asset-row'}
+                    onClick={() => setSelectedAssetId(asset.id)}
+                  >
+                    <span>
+                      <strong>{asset.name}</strong>
+                      <small>{asset.contact}</small>
+                    </span>
+                    <span>{asset.type}</span>
+                    <span>{asset.platform}</span>
+                    <span>{asset.fitScore}</span>
+                    <span>{asset.status}</span>
+                    <span>{asset.handling}</span>
+                    <span>{asset.nextAction}</span>
+                  </button>
+                ))
+              ) : (
+                <div className="empty-state">当前没有符合条件的资产结果。</div>
+              )}
+            </div>
+          </div>
+        </section>
+      </div>
+    )
+  }
+
+  function renderConversationsPage() {
+    return (
+      <div className="conversation-grid">
+        <section className="surface inbox-surface">
+          <div className="section-head">
+            <div>
+              <p className="eyebrow">会话列表</p>
+              <h2>待处理沟通</h2>
+            </div>
+          </div>
+          <input
+            className="search-input"
+            value={conversationSearch}
+            onChange={(event) => setConversationSearch(event.target.value)}
+            placeholder="搜索会话、状态、平台"
+          />
+
+          <div className="inbox-list">
+            {inboxAssets.length ? (
+              inboxAssets.map((asset) => (
+                <button
+                  key={asset.id}
+                  type="button"
+                  className={selectedConversationAsset?.id === asset.id ? 'inbox-item active' : 'inbox-item'}
+                  onClick={() => {
+                    setActiveTaskId(asset.taskId)
+                    setSelectedAssetId(asset.id)
+                  }}
+                >
+                  <div className="inbox-topline">
+                    <strong>{asset.name}</strong>
+                    <span>{asset.status}</span>
+                  </div>
+                  <small>{asset.taskTitle}</small>
+                  <p>{asset.lastAction}</p>
+                </button>
+              ))
+            ) : (
+              <div className="empty-state">还没有会话对象。</div>
+            )}
+          </div>
+        </section>
+
+        <section className="surface thread-surface">
+          <div className="section-head">
+            <div>
+              <p className="eyebrow">完整消息流</p>
+              <h2>{selectedConversationAsset?.name || '选择一条会话'}</h2>
+            </div>
+          </div>
+
+          <div className="thread-meta">
+            <span>{selectedConversationAsset?.platform || '-'}</span>
+            <span>{selectedConversationAsset?.handling || '-'}</span>
+            <span>{selectedConversationAsset?.status || '-'}</span>
+          </div>
+
+          <div className="message-stream">
+            {selectedConversationAsset ? (
+              selectedConversationAsset.conversation.map((message, index) => (
+                <article key={`${message.role}-${index}`} className={`message-bubble ${message.role}`}>
+                  <strong>{message.role === 'agent' ? '我方' : '对方'}</strong>
+                  <p>{message.text}</p>
+                </article>
+              ))
+            ) : (
+              <div className="empty-state">选择一条会话后，这里会展示完整上下文。</div>
+            )}
+          </div>
+
+          <label className="field">
+            <span>回复草稿</span>
+            <textarea
+              className="prompt-box compact"
+              value={replyDraft}
+              onChange={(event) => setReplyDraft(event.target.value)}
+              placeholder="在这里编辑要发出的回复。"
+            />
+          </label>
+
+          <div className="action-row">
+            <button type="button" className="primary-button" onClick={sendReply} disabled={loading || !replyDraft.trim()}>
+              发送回复
+            </button>
+          </div>
+        </section>
+      </div>
+    )
+  }
+
+  function renderBrandPage() {
+    return (
+      <section className="surface">
+        <div className="section-head">
+          <div>
+            <p className="eyebrow">品牌资料底座</p>
+            <h2>这里是整个壳层调用品牌上下文的来源</h2>
           </div>
         </div>
-        <div className="toolbar-inline">
-          <div className="context-pill">
-            <span>当前品牌</span>
-            <strong>{bootstrap.brands.find((brand) => brand.id === brandId)?.name || '-'}</strong>
+        <div className="form-grid">
+          <label className="field">
+            <span>品牌介绍</span>
+            <textarea value={brandProfile.intro} onChange={(event) => setBrandProfile((prev) => ({ ...prev, intro: event.target.value }))} />
+          </label>
+          <label className="field">
+            <span>产品卖点 / SKU</span>
+            <textarea value={brandProfile.productPoints} onChange={(event) => setBrandProfile((prev) => ({ ...prev, productPoints: event.target.value }))} />
+          </label>
+          <label className="field">
+            <span>可接受合作方式</span>
+            <textarea value={brandProfile.cooperationModes} onChange={(event) => setBrandProfile((prev) => ({ ...prev, cooperationModes: event.target.value }))} />
+          </label>
+          <label className="field">
+            <span>过往案例 / 证明</span>
+            <textarea value={brandProfile.campaignProof} onChange={(event) => setBrandProfile((prev) => ({ ...prev, campaignProof: event.target.value }))} />
+          </label>
+          <label className="field full">
+            <span>常见问题 / FAQ</span>
+            <textarea value={brandProfile.faq} onChange={(event) => setBrandProfile((prev) => ({ ...prev, faq: event.target.value }))} />
+          </label>
+        </div>
+      </section>
+    )
+  }
+
+  function renderChannelsPage() {
+    return (
+      <section className="surface">
+        <div className="section-head">
+          <div>
+            <p className="eyebrow">通道状态</p>
+            <h2>当前这套壳层能抓、能发、能接什么执行端</h2>
           </div>
-          <div className="context-pill">
-            <span>当前任务</span>
-            <strong>{activeTaskSummary.title}</strong>
+        </div>
+        <div className="channel-grid">
+          {channelPresets.map((channel) => (
+            <article key={channel.name} className="channel-card">
+              <div className="channel-head">
+                <strong>{channel.name}</strong>
+                <span>{channel.status}</span>
+              </div>
+              <p>{channel.ability}</p>
+              <small>{channel.note}</small>
+            </article>
+          ))}
+        </div>
+      </section>
+    )
+  }
+
+  function renderSettingsPage() {
+    return (
+      <section className="surface">
+        <div className="section-head">
+          <div>
+            <p className="eyebrow">系统设置</p>
+            <h2>定义默认语气、跟进规则和总结规则</h2>
           </div>
-          <div className="context-pill">
-            <span>触达方式可用</span>
-            <strong>{`${taskDraft.outreachMethods.length}/${Object.keys(taskForm.outreachMethods).length}`}</strong>
+        </div>
+        <div className="form-grid">
+          <label className="field">
+            <span>默认英文风格</span>
+            <input value={settingsState.englishTone} onChange={(event) => setSettingsState((prev) => ({ ...prev, englishTone: event.target.value }))} />
+          </label>
+          <label className="field">
+            <span>自动跟进规则</span>
+            <input value={settingsState.followupRule} onChange={(event) => setSettingsState((prev) => ({ ...prev, followupRule: event.target.value }))} />
+          </label>
+          <label className="field full">
+            <span>回填总结规则</span>
+            <textarea value={settingsState.summaryRule} onChange={(event) => setSettingsState((prev) => ({ ...prev, summaryRule: event.target.value }))} />
+          </label>
+        </div>
+      </section>
+    )
+  }
+
+  function renderCenterContent() {
+    if (pageId === 'overview') return renderOverviewPage()
+    if (pageId === 'tasks') return renderTasksPage()
+    if (pageId === 'assets') return renderAssetsPage()
+    if (pageId === 'conversations') return renderConversationsPage()
+    if (pageId === 'brand') return renderBrandPage()
+    if (pageId === 'channels') return renderChannelsPage()
+    return renderSettingsPage()
+  }
+
+  function renderRightRail() {
+    if (pageId === 'tasks') {
+      return (
+        <div className="right-stack">
+          <section className="surface compact-surface">
+            <p className="eyebrow">当前任务摘要</p>
+            {activeTaskSummary ? (
+              <>
+                <h3>{activeTaskSummary.title}</h3>
+                <div className="detail-list">
+                  <article><span>产品</span><strong>{activeTaskSummary.product}</strong></article>
+                  <article><span>市场</span><strong>{activeTaskSummary.market}</strong></article>
+                  <article><span>平台</span><strong>{activeTaskSummary.platforms}</strong></article>
+                  <article><span>约束</span><strong>{activeTaskSummary.constraints}</strong></article>
+                </div>
+              </>
+            ) : (
+              <p className="empty-note">还没有任务。</p>
+            )}
+          </section>
+
+          <section className="surface compact-surface">
+            <p className="eyebrow">壳层下一步</p>
+            <div className="todo-list">
+              <p>1. 创建任务并生成执行说明。</p>
+              <p>2. 发送给外部 Agent 跑搜集 / 筛选 / 结构化整理。</p>
+              <p>3. 把结果回填回来，沉淀到资产和会话里。</p>
+            </div>
+          </section>
+        </div>
+      )
+    }
+
+    if (pageId === 'assets') {
+      return (
+        <div className="right-stack">
+          <section className="surface compact-surface">
+            <p className="eyebrow">资产详情</p>
+            {selectedAsset ? (
+              <>
+                <h3>{selectedAsset.name}</h3>
+                <div className="detail-list">
+                  <article><span>对象类型</span><strong>{selectedAsset.type}</strong></article>
+                  <article><span>当前阶段</span><strong>{selectedAsset.status}</strong></article>
+                  <article><span>处理方式</span><strong>{selectedAsset.handling}</strong></article>
+                  <article><span>关系温度</span><strong>{selectedAsset.relationship}</strong></article>
+                </div>
+                <div className="surface-note">
+                  <strong>推荐动作</strong>
+                  <p>{selectedAsset.nextAction}</p>
+                </div>
+              </>
+            ) : (
+              <p className="empty-note">选择一条资产后，这里会显示关系与建议。</p>
+            )}
+          </section>
+        </div>
+      )
+    }
+
+    if (pageId === 'conversations') {
+      return (
+        <div className="right-stack">
+          <section className="surface compact-surface">
+            <p className="eyebrow">AI 副驾驶</p>
+            {selectedConversationAsset ? (
+              <>
+                <h3>{selectedConversationAsset.name}</h3>
+                <div className="detail-list">
+                  <article><span>当前判断</span><strong>{selectedConversationAsset.status}</strong></article>
+                  <article><span>处理建议</span><strong>{selectedConversationAsset.handling}</strong></article>
+                </div>
+              </>
+            ) : (
+              <p className="empty-note">选择一条会话后，这里会给出回复建议。</p>
+            )}
+          </section>
+
+          {selectedSuggestions.map((item) => (
+            <section key={item.title} className="surface compact-surface suggestion-block">
+              <strong>{item.title}</strong>
+              <p>{item.body}</p>
+              <button type="button" className="soft-chip align-left" onClick={() => setReplyDraft(item.body)}>
+                放入回复框
+              </button>
+            </section>
+          ))}
+        </div>
+      )
+    }
+
+    if (pageId === 'brand') {
+      return (
+        <div className="right-stack">
+          <section className="surface compact-surface">
+            <p className="eyebrow">为什么品牌资料重要</p>
+            <p className="empty-note">
+              这页不是摆设。外部 Agent 回答品牌背景、卖点、合作边界、过往案例时，都应该从这里抽信息。
+            </p>
+          </section>
+        </div>
+      )
+    }
+
+    if (pageId === 'channels') {
+      return (
+        <div className="right-stack">
+          <section className="surface compact-surface">
+            <p className="eyebrow">通道说明</p>
+            <p className="empty-note">
+              这一层只负责告诉系统：哪些地方能抓，哪些地方能发，哪些外部 Agent 能接任务。
+            </p>
+          </section>
+        </div>
+      )
+    }
+
+    if (pageId === 'settings') {
+      return (
+        <div className="right-stack">
+          <section className="surface compact-surface">
+            <p className="eyebrow">设置作用</p>
+            <p className="empty-note">
+              这里定义系统默认语气、自动跟进节奏和总结方式，让壳层在不同任务里保持一致。
+            </p>
+          </section>
+        </div>
+      )
+    }
+
+    return (
+      <div className="right-stack">
+        <section className="surface compact-surface">
+          <p className="eyebrow">当前品牌</p>
+          <h3>{currentBrand?.name || '未选择品牌'}</h3>
+          <p className="empty-note">{currentBrand?.overview || '这里会显示当前品牌的工作语境。'}</p>
+        </section>
+      </div>
+    )
+  }
+
+  if (!token) {
+    return (
+      <div className="login-shell">
+        <section className="login-hero">
+          <p className="eyebrow">Outreach Shell for External Agents</p>
+          <h1>方洲AI</h1>
+          <p className="login-copy">
+            把 OpenCloud、Codex、人工执行都包进同一套跨境外联流程里。
+            统一任务、统一记忆、统一回填、统一资产沉淀。
+          </p>
+          <div className="login-points">
+            <article><strong>任务中枢</strong><span>自然语言创建任务，系统自动生成执行说明</span></article>
+            <article><strong>云端记忆</strong><span>所有会话、约束、资料和结果都留在云端</span></article>
+            <article><strong>外部执行</strong><span>外部 Agent 跑执行，你的系统只负责编排与沉淀</span></article>
           </div>
+        </section>
+
+        <section className="login-card">
+          <div className="auth-tabs">
+            <button type="button" className={authTab === 'login' ? 'soft-chip active' : 'soft-chip'} onClick={() => setAuthTab('login')}>
+              登录
+            </button>
+            <button type="button" className={authTab === 'register' ? 'soft-chip active' : 'soft-chip'} onClick={() => setAuthTab('register')}>
+              注册
+            </button>
+          </div>
+
+          {error ? <div className="error-banner">{error}</div> : null}
+
+          {authTab === 'login' ? (
+            <div className="form-grid single">
+              <label className="field">
+                <span>邮箱</span>
+                <input value={loginForm.username} onChange={(event) => setLoginForm((prev) => ({ ...prev, username: event.target.value }))} />
+              </label>
+              <label className="field">
+                <span>密码</span>
+                <input type="password" value={loginForm.password} onChange={(event) => setLoginForm((prev) => ({ ...prev, password: event.target.value }))} />
+              </label>
+              <button type="button" className="primary-button" onClick={handleLogin} disabled={loading}>
+                {loading ? '登录中...' : '进入系统'}
+              </button>
+            </div>
+          ) : (
+            <div className="form-grid single">
+              <label className="field">
+                <span>姓名</span>
+                <input value={registerForm.name} onChange={(event) => setRegisterForm((prev) => ({ ...prev, name: event.target.value }))} />
+              </label>
+              <label className="field">
+                <span>邮箱</span>
+                <input value={registerForm.email} onChange={(event) => setRegisterForm((prev) => ({ ...prev, email: event.target.value }))} />
+              </label>
+              <label className="field">
+                <span>密码</span>
+                <input type="password" value={registerForm.password} onChange={(event) => setRegisterForm((prev) => ({ ...prev, password: event.target.value }))} />
+              </label>
+              <button type="button" className="primary-button" onClick={handleRegister} disabled={loading}>
+                {loading ? '注册中...' : '注册并进入'}
+              </button>
+            </div>
+          )}
+
+          <div className="login-footnote">
+            <span>当前存储：{bootstrap.storageMode}</span>
+            <span>当前账号模式：{bootstrap.authMode}</span>
+          </div>
+        </section>
+      </div>
+    )
+  }
+
+  return (
+    <div className="shell-app">
+      {error ? <div className="error-banner floating">{error}</div> : null}
+
+      <aside className="sidebar">
+        <div className="sidebar-top">
+          <div className="brand-mark">方</div>
+          <div>
+            <p className="eyebrow">Fangzhou AI</p>
+            <strong>外联业务壳层</strong>
+          </div>
+        </div>
+
+        <label className="workspace-switch">
+          <span>品牌空间</span>
           <select value={brandId} onChange={(event) => setBrandId(event.target.value)}>
             {bootstrap.brands.map((brand) => (
               <option key={brand.id} value={brand.id}>
@@ -1039,702 +1357,112 @@ function App() {
               </option>
             ))}
           </select>
-          <div className="user-chip">{currentUser.name}</div>
-          <button type="button" className="chip-button" onClick={handleLogout}>
+        </label>
+
+        <button type="button" className="primary-button sidebar-button" onClick={() => setPageId('tasks')}>
+          + 新建任务
+        </button>
+
+        <input
+          className="search-input"
+          value={taskSearch}
+          onChange={(event) => setTaskSearch(event.target.value)}
+          placeholder="搜索任务 / SKU / 市场"
+        />
+
+        <nav className="sidebar-nav">
+          {navItems.map((item) => (
+            <button key={item.id} type="button" className={pageId === item.id ? 'nav-button active' : 'nav-button'} onClick={() => setPageId(item.id)}>
+              {item.label}
+            </button>
+          ))}
+        </nav>
+
+        <section className="sidebar-section">
+          <div className="section-head compact">
+            <div>
+              <p className="eyebrow">最近任务</p>
+            </div>
+          </div>
+          <div className="sidebar-scroll">
+            {visibleTasks.length ? (
+              visibleTasks.map((task) => {
+                const summary = parseInstruction(task)
+                return (
+                  <button
+                    key={task.id}
+                    type="button"
+                    className={activeTask?.id === task.id ? 'task-link active' : 'task-link'}
+                    onClick={() => {
+                      setActiveTaskId(task.id)
+                      setPageId('tasks')
+                    }}
+                  >
+                    <strong>{summary.title}</strong>
+                    <small>{`${summary.market} · ${summary.product}`}</small>
+                    <span>{normalizeTaskStatus(task.status)}</span>
+                  </button>
+                )
+              })
+            ) : (
+              <div className="empty-note">还没有任务。</div>
+            )}
+          </div>
+        </section>
+
+        <section className="sidebar-section">
+          <div className="section-head compact">
+            <div>
+              <p className="eyebrow">最近会话</p>
+            </div>
+          </div>
+          <div className="sidebar-scroll slim">
+            {allConversationAssets.slice(0, 5).map((asset) => (
+              <button
+                key={asset.id}
+                type="button"
+                className="task-link slim"
+                onClick={() => {
+                  setPageId('conversations')
+                  setActiveTaskId(asset.taskId)
+                  setSelectedAssetId(asset.id)
+                }}
+              >
+                <strong>{asset.name}</strong>
+                <small>{asset.lastAction}</small>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <div className="sidebar-bottom">
+          <div className="user-card">
+            <strong>{currentUser?.name || '当前用户'}</strong>
+            <small>{currentUser?.username || '-'}</small>
+          </div>
+          <button type="button" className="soft-chip align-left" onClick={handleLogout}>
             退出
           </button>
         </div>
-      </header>
+      </aside>
 
-      {error ? <div className="error-banner">{error}</div> : null}
+      <main className="main-panel">
+        <header className="context-bar">
+          <div className="context-left">
+            <strong>{currentBrand?.name || '未选择品牌'}</strong>
+            <span>{currentBrand?.overview || '这里显示当前品牌的工作语境。'}</span>
+          </div>
+          <div className="context-tags">
+            <span>{bootstrap.storageMode}</span>
+            <span>{bootstrap.authMode}</span>
+            <span>{currentUser?.authMode || 'session'}</span>
+          </div>
+        </header>
 
-      <div className="workspace-grid">
-        <aside className="left-rail">
-          <section className="panel rail-panel rail-sidebar">
-            <div className="sidebar-brand">
-              <div className="sidebar-brand-stack">
-                <span className="eyebrow">Workspace</span>
-                <strong>方洲AI</strong>
-                <button type="button" className="workspace-switch">
-                  {bootstrap.brands.find((brand) => brand.id === brandId)?.name || 'Demo Brand'} ▼
-                </button>
-              </div>
-              <button type="button" className="collapse-button" aria-label="收起侧栏">
-                ≡
-              </button>
-            </div>
+        <section className="content-area">{renderCenterContent()}</section>
+      </main>
 
-            <button
-              type="button"
-              className="primary-button sidebar-primary"
-              onClick={() => {
-                setPageId('create')
-                setCurrentTaskId('')
-              }}
-            >
-              + 新建任务
-            </button>
-
-            <input
-              className="search-input compact-search"
-              placeholder="搜索任务、SKU、市场"
-              value={taskQuery}
-              onChange={(event) => setTaskQuery(event.target.value)}
-            />
-
-            <div className="sidebar-nav">
-              <p className="section-label">导航</p>
-              <div className="nav-list">
-                {workspaceNavItems.map((item) => {
-                  const active = item.target === pageId
-
-                  return (
-                    <button key={item.id} type="button" className={active ? 'nav-item active' : 'nav-item'} onClick={() => setPageId(item.target)}>
-                      {item.label}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
-            <div className="recent-head">
-              <div>
-                <p className="section-label">最近任务</p>
-                <h3>{taskStatusSummary(normalizedTasks)}</h3>
-              </div>
-              <span className="muted-text">{filteredTasks.length} 条</span>
-            </div>
-
-            <div className="filter-row sidebar-filter-row">
-              {taskStatusFilters.map((item) => (
-                <button key={item} type="button" className={taskFilter === item ? 'filter-chip active' : 'filter-chip'} onClick={() => setTaskFilter(item)}>
-                  {item}
-                </button>
-              ))}
-            </div>
-
-            <div className="task-list">
-              {filteredTasks.map((task) => (
-                <button
-                  key={task.id}
-                  type="button"
-                  className={task.id === currentTask?.id ? 'task-row active' : 'task-row'}
-                  onClick={() => {
-                    setCurrentTaskId(task.id)
-                    setPageId('execute')
-                  }}
-                >
-                  <div className="task-row-top">
-                    <strong>{task.display.title}</strong>
-                    <span className="status-tag">{task.display.status}</span>
-                  </div>
-                  <span>{task.display.meta}</span>
-                  <small>{formatTime(task.createdAt)}</small>
-                </button>
-              ))}
-            </div>
-
-            <div className="sidebar-footer">
-              <div className="user-chip user-footer-chip">
-                <span>{currentUser.name}</span>
-                <small>{bootstrap.brands.find((brand) => brand.id === brandId)?.name || '-'}</small>
-              </div>
-              <button type="button" className="chip-button" onClick={handleLogout}>
-                退出
-              </button>
-            </div>
-          </section>
-        </aside>
-
-        <main className="center-column">
-          <section className="panel context-bar">
-            <div className="context-bar-main">
-              <strong>{bootstrap.brands.find((brand) => brand.id === brandId)?.name || '-'}</strong>
-              <span>{taskDraft.productName}</span>
-              <span>{taskDraft.market}</span>
-              <span>{taskDraft.industryDirection}</span>
-            </div>
-            <div className="context-bar-side">
-              <span>{`目标 ${taskForm.targetReach} 位达人`}</span>
-              <span>{`佣金 ≤ ${taskForm.commissionCap}%`}</span>
-              <span>{taskForm.allowSeeding ? '支持寄样' : '不寄样'}</span>
-            </div>
-          </section>
-
-          <section className="panel tab-panel">
-            {['create', 'execute', 'conversation'].includes(pageId) ? (
-              <div className="mode-switch">
-                {taskPageTabs.map((tab) => (
-                  <button key={tab.id} type="button" className={pageId === tab.id ? 'mode-chip active' : 'mode-chip'} onClick={() => setPageId(tab.id)}>
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-
-            {pageId === 'overview' ? (
-              <div className="overview-layout">
-                <section className="summary-strip">
-                  <div className="summary-block">
-                    <span>本周新增资产</span>
-                    <strong>{dashboard.dataCenter?.influencerPool || 0}</strong>
-                  </div>
-                  <div className="summary-block">
-                    <span>已触达</span>
-                    <strong>{dashboard.overview?.outreachInProgress || 0}</strong>
-                  </div>
-                  <div className="summary-block">
-                    <span>高意向</span>
-                    <strong>{dashboard.overview?.warmLeads || 0}</strong>
-                  </div>
-                  <div className="summary-block">
-                    <span>待回填</span>
-                    <strong>{dashboard.overview?.pendingRefillCount || 0}</strong>
-                  </div>
-                  <div className="summary-block">
-                    <span>最近提醒</span>
-                    <strong>{dashboard.reminders?.length || 0}</strong>
-                  </div>
-                </section>
-
-                <section className="table-card">
-                  <div className="table-card-head">
-                    <div>
-                      <p className="section-label">总览</p>
-                      <h3>系统正在推进的工作</h3>
-                    </div>
-                  </div>
-                  <div className="timeline-list">
-                    {timeline.slice(0, 6).map((item, index) => (
-                      <article key={`${item.time}-${item.title}-${index}`} className="timeline-item">
-                        <span>{item.time}</span>
-                        <strong>{item.title}</strong>
-                        <p>{item.detail}</p>
-                      </article>
-                    ))}
-                  </div>
-                </section>
-              </div>
-            ) : null}
-
-            {pageId === 'brand' ? (
-              <div className="settings-layout">
-                <section className="form-card">
-                  <div className="table-card-head">
-                    <div>
-                      <p className="section-label">品牌资料</p>
-                      <h3>AI 可调用的知识底座</h3>
-                    </div>
-                  </div>
-                  <div className="field-grid">
-                    <label>
-                      <span>品牌介绍</span>
-                      <textarea defaultValue="方洲AI 帮跨境品牌把外联沟通、会话推进和合作资产沉淀统一到一个操作台里。" />
-                    </label>
-                    <label>
-                      <span>产品卖点</span>
-                      <textarea defaultValue="便携、适合健身与恢复场景、适合短视频种草与测评。" />
-                    </label>
-                    <label>
-                      <span>合作方式</span>
-                      <textarea defaultValue="寄样 + 佣金，必要时可人工接管高价值合作。" />
-                    </label>
-                    <label>
-                      <span>常见问答</span>
-                      <textarea defaultValue="可提供品牌介绍、过往 campaign、物流说明和基础 KPI 目标。" />
-                    </label>
-                  </div>
-                </section>
-              </div>
-            ) : null}
-
-            {pageId === 'channels' ? (
-              <div className="settings-layout">
-                <section className="table-card">
-                  <div className="table-card-head">
-                    <div>
-                      <p className="section-label">通道状态</p>
-                      <h3>当前可用能力</h3>
-                    </div>
-                  </div>
-                  <div className="structured-summary-grid">
-                    <article className="summary-block compact"><span>Gmail</span><strong>已授权 / 可发送</strong></article>
-                    <article className="summary-block compact"><span>Instagram</span><strong>已授权 / 可抓取 / 可 DM</strong></article>
-                    <article className="summary-block compact"><span>TikTok</span><strong>可抓取 / 私信受限</strong></article>
-                    <article className="summary-block compact"><span>YouTube</span><strong>可抓取</strong></article>
-                    <article className="summary-block compact"><span>WhatsApp</span><strong>未连接</strong></article>
-                  </div>
-                </section>
-              </div>
-            ) : null}
-
-            {pageId === 'settings' ? (
-              <div className="settings-layout">
-                <section className="form-card">
-                  <div className="table-card-head">
-                    <div>
-                      <p className="section-label">设置</p>
-                      <h3>默认偏好</h3>
-                    </div>
-                  </div>
-                  <div className="field-grid">
-                    <label>
-                      <span>默认英语风格</span>
-                      <select defaultValue="自然专业">
-                        <option>自然专业</option>
-                        <option>更强势</option>
-                        <option>更保守</option>
-                      </select>
-                    </label>
-                    <label>
-                      <span>自动跟进规则</span>
-                      <select defaultValue="48小时后提醒">
-                        <option>48小时后提醒</option>
-                        <option>72小时后提醒</option>
-                        <option>仅人工处理</option>
-                      </select>
-                    </label>
-                  </div>
-                </section>
-              </div>
-            ) : null}
-
-            {pageId === 'create' ? (
-              <div className="create-layout">
-                <section className="form-card prompt-card">
-                  <div className="table-card-head">
-                    <div>
-                      <p className="section-label">自然语言创建</p>
-                      <h3>先描述目标，再生成任务</h3>
-                    </div>
-                  </div>
-                  <label className="composer-field">
-                    <span>任务描述</span>
-                    <textarea
-                      className="prompt-textarea"
-                      value={taskPrompt}
-                      onChange={(event) => setTaskPrompt(event.target.value)}
-                      placeholder="例如：帮我创建一个美国健身类 TikTok 达人首轮触达任务，目标 50 人，合作方式寄样 + 佣金，佣金不超过 14%。"
-                    />
-                  </label>
-                  <div className="quick-prompt-row">
-                    {quickPromptPresets.map((item) => (
-                      <button key={item} type="button" className="filter-chip" onClick={() => setTaskPrompt(item)}>
-                        {item}
-                      </button>
-                    ))}
-                  </div>
-                </section>
-
-                <section className="form-card structured-card">
-                  <div className="table-card-head">
-                    <div>
-                      <p className="section-label">任务说明</p>
-                      <h3>结构化结果</h3>
-                    </div>
-                  </div>
-                  <div className="structured-summary-grid">
-                    <article className="summary-block compact">
-                      <span>任务</span>
-                      <strong>{taskDraft.taskName}</strong>
-                    </article>
-                    <article className="summary-block compact">
-                      <span>产品</span>
-                      <strong>{taskDraft.productName}</strong>
-                    </article>
-                    <article className="summary-block compact">
-                      <span>市场</span>
-                      <strong>{taskDraft.market}</strong>
-                    </article>
-                    <article className="summary-block compact">
-                      <span>目标平台</span>
-                      <strong>{taskDraft.platforms.join(' / ') || '-'}</strong>
-                    </article>
-                    <article className="summary-block compact">
-                      <span>触达方式</span>
-                      <strong>{taskDraft.outreachMethods.join(' / ') || '-'}</strong>
-                    </article>
-                    <article className="summary-block compact">
-                      <span>目标人数</span>
-                      <strong>{`${taskDraft.targetReach} 位达人`}</strong>
-                    </article>
-                  </div>
-                </section>
-
-                <section className="form-card">
-                  <h4>任务信息</h4>
-                  <div className="field-grid">
-                    <label>
-                      <span>任务名称</span>
-                      <input value={taskForm.taskName} onChange={(event) => setTaskForm((prev) => ({ ...prev, taskName: event.target.value }))} />
-                    </label>
-                    <label>
-                      <span>产品 / SKU</span>
-                      <input value={taskForm.productName} onChange={(event) => setTaskForm((prev) => ({ ...prev, productName: event.target.value }))} />
-                    </label>
-                    <label>
-                      <span>市场</span>
-                      <select value={taskForm.market} onChange={(event) => setTaskForm((prev) => ({ ...prev, market: event.target.value }))}>
-                        <option>美国</option>
-                        <option>英国</option>
-                        <option>德国</option>
-                      </select>
-                    </label>
-                    <label>
-                      <span>行业方向</span>
-                      <input value={taskForm.industryDirection} onChange={(event) => setTaskForm((prev) => ({ ...prev, industryDirection: event.target.value }))} />
-                    </label>
-                    <label>
-                      <span>达人范围</span>
-                      <select value={taskForm.creatorTier} onChange={(event) => setTaskForm((prev) => ({ ...prev, creatorTier: event.target.value }))}>
-                        <option>5k - 100k</option>
-                        <option>50k - 300k</option>
-                        <option>300k+</option>
-                      </select>
-                    </label>
-                    <label>
-                      <span>合作方式</span>
-                      <select value={taskForm.cooperationModel} onChange={(event) => setTaskForm((prev) => ({ ...prev, cooperationModel: event.target.value }))}>
-                        <option>寄样 + 佣金</option>
-                        <option>纯佣金</option>
-                        <option>固定费 + 佣金</option>
-                      </select>
-                    </label>
-                  </div>
-                </section>
-
-                <section className="form-card">
-                  <h4>目标平台</h4>
-                  <div className="toggle-grid">
-                    {Object.entries(taskForm.platforms).map(([label, enabled]) => (
-                      <button
-                        key={label}
-                        type="button"
-                        className={enabled ? 'toggle-pill active' : 'toggle-pill'}
-                        onClick={() =>
-                          setTaskForm((prev) => ({
-                            ...prev,
-                            platforms: { ...prev.platforms, [label]: !prev.platforms[label] },
-                          }))
-                        }
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-
-                  <h4>触达方式</h4>
-                  <div className="toggle-grid">
-                    {Object.entries(taskForm.outreachMethods).map(([label, enabled]) => (
-                      <button
-                        key={label}
-                        type="button"
-                        className={enabled ? 'toggle-pill active' : 'toggle-pill'}
-                        onClick={() =>
-                          setTaskForm((prev) => ({
-                            ...prev,
-                            outreachMethods: { ...prev.outreachMethods, [label]: !prev.outreachMethods[label] },
-                          }))
-                        }
-                      >
-                        {enabled ? `${label} 已授权` : `${label} 未授权`}
-                      </button>
-                    ))}
-                  </div>
-                </section>
-
-                <section className="form-card">
-                  <h4>合作约束</h4>
-                  <label>
-                    <span>佣金上限 {taskForm.commissionCap}%</span>
-                    <input
-                      type="range"
-                      min="5"
-                      max="30"
-                      value={taskForm.commissionCap}
-                      onChange={(event) => setTaskForm((prev) => ({ ...prev, commissionCap: Number(event.target.value) }))}
-                    />
-                  </label>
-                  <label>
-                    <span>目标触达人数</span>
-                    <input
-                      type="number"
-                      min="1"
-                      value={taskForm.targetReach}
-                      onChange={(event) => setTaskForm((prev) => ({ ...prev, targetReach: Number(event.target.value) || 1 }))}
-                    />
-                  </label>
-                  <div className="constraint-grid">
-                    <button type="button" className={taskForm.allowSeeding ? 'toggle-pill active' : 'toggle-pill'} onClick={() => setTaskForm((prev) => ({ ...prev, allowSeeding: !prev.allowSeeding }))}>
-                      {taskForm.allowSeeding ? '允许寄样' : '不允许寄样'}
-                    </button>
-                    <button type="button" className={taskForm.allowFixedFee ? 'toggle-pill active' : 'toggle-pill'} onClick={() => setTaskForm((prev) => ({ ...prev, allowFixedFee: !prev.allowFixedFee }))}>
-                      {taskForm.allowFixedFee ? '允许固定费' : '不允许固定费'}
-                    </button>
-                    <button type="button" className={taskForm.avoidCompetitors ? 'toggle-pill active' : 'toggle-pill'} onClick={() => setTaskForm((prev) => ({ ...prev, avoidCompetitors: !prev.avoidCompetitors }))}>
-                      {taskForm.avoidCompetitors ? '排除竞品达人' : '接受竞品达人'}
-                    </button>
-                  </div>
-                  {taskDraft.missingInfo.length > 0 ? <p className="helper-text">{taskDraft.missingInfo.join('；')}</p> : null}
-                </section>
-
-                <section className="form-card">
-                  <h4>动作</h4>
-                  <div className="detail-note">
-                    <strong>当前任务说明</strong>
-                    <p>{`${taskDraft.taskName} ｜ ${taskDraft.market} ｜ ${taskDraft.industryDirection} ｜ 目标触达 ${taskDraft.targetReach} 位达人`}</p>
-                  </div>
-                  <div className="panel-actions">
-                    <button type="button" className="primary-button" disabled={creatingTask} onClick={createTask}>
-                      {creatingTask ? '创建中...' : '创建任务'}
-                    </button>
-                    <button type="button" className="chip-button" disabled={!currentTask} onClick={startExecution}>
-                      开始执行
-                    </button>
-                  </div>
-                </section>
-              </div>
-            ) : null}
-
-            {pageId === 'execute' ? (
-              <div className="execute-layout">
-                <div className="execute-toolbar">
-                  <div className="execute-toolbar-copy">
-                    <p className="section-label">执行台</p>
-                    <h3>{activeTaskSummary.title}</h3>
-                    <p className="helper-text">这里只统计当前任务。上面看漏斗，下面推进线索。</p>
-                  </div>
-                  <input
-                    className="search-input"
-                    placeholder="搜索达人 / 平台 / 联系方式"
-                    value={leadQuery}
-                    onChange={(event) => setLeadQuery(event.target.value)}
-                  />
-                </div>
-
-                <section className="bulk-panel">
-                  <div className="table-card-head">
-                    <div>
-                      <p className="section-label">批量操作</p>
-                      <h3>{selectedLeadIds.length > 0 ? `已选 ${selectedLeadIds.length} 条线索` : '先勾选线索再批量操作'}</h3>
-                    </div>
-                    <button type="button" className="chip-button" onClick={toggleSelectAllFilteredLeads}>
-                      {filteredLeads.length > 0 && filteredLeads.every((lead) => selectedLeadIds.includes(lead.id)) ? '取消全选' : '全选当前筛选结果'}
-                    </button>
-                  </div>
-                  <div className="bulk-grid">
-                    <label>
-                      <span>批量状态</span>
-                      <select value={bulkStatus} onChange={(event) => setBulkStatus(event.target.value)}>
-                        <option value="">不修改</option>
-                        {leadStatuses.map((status) => (
-                          <option key={status} value={status}>
-                            {status}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      <span>批量处理方式</span>
-                      <select value={bulkHandling} onChange={(event) => setBulkHandling(event.target.value)}>
-                        <option value="">不修改</option>
-                        {handlingModes.map((handling) => (
-                          <option key={handling} value={handling}>
-                            {handling}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      <span>批量提醒时间</span>
-                      <input type="datetime-local" value={bulkReminderAt} onChange={(event) => setBulkReminderAt(event.target.value)} />
-                    </label>
-                    <label>
-                      <span>批量提醒备注</span>
-                      <input value={bulkReminderNote} onChange={(event) => setBulkReminderNote(event.target.value)} placeholder="例如：48 小时后统一二次跟进" />
-                    </label>
-                  </div>
-                  <label className="bulk-note">
-                    <span>批量下一步动作</span>
-                    <input value={bulkNextAction} onChange={(event) => setBulkNextAction(event.target.value)} placeholder="例如：统一进入第二轮触达" />
-                  </label>
-                  <div className="panel-actions">
-                    <button type="button" className="primary-button" disabled={updatingLead || selectedLeadIds.length === 0} onClick={applyBulkUpdate}>
-                      {updatingLead ? '批量处理中...' : '应用批量操作'}
-                    </button>
-                  </div>
-                </section>
-
-                <div className="funnel-grid">
-                  <button type="button" className={stageFilter === '全部' ? 'stage-card active' : 'stage-card'} onClick={() => setStageFilter('全部')}>
-                    <span>全部</span>
-                    <strong>{leads.length}</strong>
-                  </button>
-                  {Object.entries(funnel).map(([label, value]) => (
-                    <button key={label} type="button" className={stageFilter === label ? 'stage-card active' : 'stage-card'} onClick={() => setStageFilter(label)}>
-                      <span>{label}</span>
-                      <strong>{value}</strong>
-                    </button>
-                  ))}
-                </div>
-
-                <div className="execute-main">
-                  <section className="table-card">
-                    <div className="table-card-head">
-                    <div>
-                        <p className="section-label">品牌资产池</p>
-                        <h3>{activeTaskSummary.title}</h3>
-                      </div>
-                      <span className="muted-text">{`${filteredLeads.length} 条结果`}</span>
-                    </div>
-                    <div className="table-wrap">
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>选择</th>
-                            <th>名称</th>
-                            <th>平台</th>
-                            <th>粉丝量</th>
-                            <th>匹配度</th>
-                            <th>触达方式</th>
-                            <th>当前状态</th>
-                            <th>处理方式</th>
-                            <th>跟进提醒</th>
-                            <th>最近动作</th>
-                            <th>下一步动作</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredLeads.map((lead) => (
-                            <tr key={lead.id} onClick={() => setSelectedLeadId(lead.id)}>
-                              <td onClick={(event) => event.stopPropagation()}>
-                                <input type="checkbox" checked={selectedLeadIds.includes(lead.id)} onChange={() => toggleLeadSelection(lead.id)} />
-                              </td>
-                              <td>{lead.name}</td>
-                              <td>{lead.platform}</td>
-                              <td>{lead.followers}</td>
-                              <td>{lead.fitScore}</td>
-                              <td>{lead.contact}</td>
-                              <td><span className="status-tag inline">{lead.status}</span></td>
-                              <td>{lead.handling}</td>
-                              <td>{lead.reminderAt ? formatTime(lead.reminderAt) : '-'}</td>
-                              <td>{lead.lastAction}</td>
-                              <td>{lead.nextAction}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </section>
-
-                  <section className="timeline-card">
-                    <div className="table-card-head">
-                      <div>
-                        <p className="section-label">任务进展板</p>
-                        <h3>最近动作</h3>
-                      </div>
-                    </div>
-                    <div className="timeline-list">
-                      {timeline.map((item) => (
-                        <article key={`${item.time}-${item.title}`} className="timeline-item">
-                          <span>{item.time}</span>
-                          <strong>{item.title}</strong>
-                          <p>{item.detail}</p>
-                        </article>
-                      ))}
-                    </div>
-                  </section>
-                </div>
-              </div>
-            ) : null}
-
-            {pageId === 'conversation' ? (
-              <div className="conversation-page">
-                <section className="inbox-panel">
-                  <div className="table-card-head">
-                    <div>
-                      <p className="section-label">会话收件箱</p>
-                      <h3>待处理会话</h3>
-                    </div>
-                  </div>
-                  <input
-                    className="search-input"
-                    placeholder="搜索达人 / 状态 / 意图"
-                    value={conversationQuery}
-                    onChange={(event) => setConversationQuery(event.target.value)}
-                  />
-                  <div className="filter-row">
-                    {inboxStatusFilters.map((item) => (
-                      <button key={item} type="button" className={conversationFilter === item ? 'filter-chip active' : 'filter-chip'} onClick={() => setConversationFilter(item)}>
-                        {item}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="inbox-list">
-                    {inboxLeads.map((lead) => (
-                      <button key={lead.id} type="button" className={selectedLead?.id === lead.id ? 'inbox-row active' : 'inbox-row'} onClick={() => setSelectedLeadId(lead.id)}>
-                        <div className="task-row-top">
-                          <strong>{lead.name}</strong>
-                          <span className="status-tag">{lead.status}</span>
-                        </div>
-                        <span>{`${lead.platform} ｜ ${lead.handling}`}</span>
-                        <small>{lead.intent}</small>
-                      </button>
-                    ))}
-                  </div>
-                </section>
-
-                <section className="thread-panel">
-                  <div className="table-card-head">
-                    <div>
-                      <p className="section-label">当前完整会话</p>
-                      <h3>{selectedLead ? selectedLead.name : '未选中会话'}</h3>
-                    </div>
-                  </div>
-                  <div className="thread-meta">
-                    <span>{selectedLead?.platform || '-'}</span>
-                    <span>{selectedLead?.contact || '-'}</span>
-                    <span>{selectedLead?.handling || '-'}</span>
-                  </div>
-                  <div className="conversation-thread fixed">
-                    {messages.map((message, index) => (
-                      <article
-                        key={`${message.role}-${index}`}
-                        className={message.role === 'creator' ? 'message creator' : message.role === 'agent' ? 'message agent' : 'message system'}
-                      >
-                        <strong>{message.role === 'creator' ? '对方' : message.role === 'agent' ? '我方' : '系统'}</strong>
-                        <p>{message.text}</p>
-                      </article>
-                    ))}
-                  </div>
-                  <div className="composer-panel">
-                    <label className="composer-field">
-                      <span>回复内容</span>
-                      <textarea
-                        value={replyDraft}
-                        onChange={(event) => setReplyDraft(event.target.value)}
-                        placeholder="输入你要发给对方的话，或先点右侧 AI 建议放入输入框。"
-                      />
-                    </label>
-                    <div className="panel-actions">
-                      <button type="button" className="primary-button" onClick={() => sendReply()} disabled={sendingReply || !replyDraft.trim()}>
-                        {sendingReply ? '发送中...' : '发送回复'}
-                      </button>
-                      <button type="button" className="chip-button" onClick={() => setReplyDraft('')} disabled={sendingReply || !replyDraft}>
-                        清空
-                      </button>
-                    </div>
-                  </div>
-                </section>
-              </div>
-            ) : null}
-          </section>
-        </main>
-
-        <aside className="right-rail">
-          <section className="panel detail-panel">{renderDetailPanel()}</section>
-        </aside>
-      </div>
+      <aside className="assistant-rail">{renderRightRail()}</aside>
     </div>
   )
 }

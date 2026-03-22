@@ -8,6 +8,8 @@ cloudflared.exe
 cloudflared.err
 login-check.png
 render-live.png
+publish-check.png
+publish-check-auth.png
 coverage/
 .DS_Store
 Thumbs.db

@@ -1,12 +1,12 @@
 :root {
-  font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-family: 'IBM Plex Sans', 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
   line-height: 1.5;
   font-weight: 400;
   color: #122033;
   background:
-    radial-gradient(circle at top left, rgba(74, 221, 193, 0.18), transparent 28%),
-    radial-gradient(circle at top right, rgba(242, 169, 88, 0.16), transparent 24%),
-    linear-gradient(180deg, #f5f1ea 0%, #f0ebe4 100%);
+    radial-gradient(circle at top left, rgba(74, 221, 193, 0.16), transparent 28%),
+    radial-gradient(circle at top right, rgba(242, 169, 88, 0.14), transparent 24%),
+    linear-gradient(180deg, #f6f1ea 0%, #efe8dd 100%);
   --text: #122033;
   --muted: rgba(18, 32, 51, 0.7);
   --line: rgba(18, 32, 51, 0.1);
@@ -26,6 +26,8 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  color: var(--text);
+  background: inherit;
 }
 
 button,
