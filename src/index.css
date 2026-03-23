@@ -2,16 +2,11 @@
   font-family: 'IBM Plex Sans', 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  color: #122033;
+  color: #16241c;
   background:
-    radial-gradient(circle at top left, rgba(74, 221, 193, 0.16), transparent 28%),
-    radial-gradient(circle at top right, rgba(242, 169, 88, 0.14), transparent 24%),
-    linear-gradient(180deg, #f6f1ea 0%, #efe8dd 100%);
-  --text: #122033;
-  --muted: rgba(18, 32, 51, 0.7);
-  --line: rgba(18, 32, 51, 0.1);
-  --accent: #2f9d83;
-  --accent-strong: #f2a958;
+    radial-gradient(circle at top left, rgba(94, 156, 122, 0.18), transparent 26%),
+    radial-gradient(circle at top right, rgba(201, 155, 88, 0.16), transparent 24%),
+    linear-gradient(180deg, #eee6d9 0%, #e7dece 100%);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -26,7 +21,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  color: var(--text);
+  color: #16241c;
   background: inherit;
 }
 
@@ -54,7 +49,7 @@ button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid #4e9876;
   outline-offset: 2px;
 }
 

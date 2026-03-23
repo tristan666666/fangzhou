@@ -12,20 +12,19 @@ const navItems = [
 ]
 
 const quickExamples = [
-  '帮我创建一个美国健身类 TikTok 达人首轮触达任务，目标 50 人，合作方式为寄样 + 佣金，佣金不超过 14%。',
-  '整理一批适合筋膜枪冷启动的 Deal 站，并给出首轮建联切入点。',
-  '建立一个 YouTube 测评合作任务，先找 20 个可寄样、粉丝 10 万以下的账号。',
-  '创建健康类媒体 PR 名单任务，输出媒体名单、联系人线索和首轮沟通框架。',
+  '帮我创建一个美国健身类 TikTok 达人首轮触达任务，目标 50 位对象，合作方式为寄样 + 佣金，佣金不超过 14%。',
+  '帮我整理一批适合筋膜枪冷启动的 Deal 站，输出可联系邮箱、推荐切入点和优先级。',
+  '帮我创建一个 YouTube 测评合作任务，优先 10 万粉以内、支持寄样的账号。',
+  '帮我整理一批健康类媒体与 PR 名单，并生成首轮建联框架。',
 ]
 
-const channelPresets = [
-  { name: 'Gmail', ability: '可发送', status: '已授权', note: '适合邮件首轮触达与长文本沟通' },
-  { name: 'Instagram DM', ability: '可发送 / 可跟进', status: '已授权', note: '适合红人私信和轻量跟进' },
-  { name: 'TikTok', ability: '可抓取', status: '可用', note: '适合候选对象搜集，私信权限受平台限制' },
-  { name: 'YouTube', ability: '可抓取', status: '可用', note: '适合测评账号与媒体型对象发现' },
-  { name: 'OpenCloud', ability: '外部 Agent 执行', status: '可接入', note: '适合跑搜集、整理、回填任务' },
-  { name: 'Codex', ability: '外部 Agent 执行', status: '可接入', note: '适合执行结构化任务和回填执行结果' },
-]
+const stageOptions = ['已抓取', '初筛通过', '已触达', '待回复', '洽谈中', '已合作', '待接管']
+const handlingOptions = ['自动触达', 'AI辅助回复', '人工接管']
+
+const loginSeed = {
+  username: 'demo@fangzhou.ai',
+  password: 'demo123',
+}
 
 const emptyDashboard = {
   brandId: '',
@@ -53,17 +52,12 @@ const emptyDashboard = {
   leadsByTask: {},
 }
 
-const loginSeed = {
-  username: 'demo@fangzhou.ai',
-  password: 'demo123',
-}
-
 const brandProfileSeed = {
-  intro: '我们是一套套在外部 Agent 之上的跨境外联业务壳层，负责统一记忆、任务编排、回填和资产沉淀。',
+  intro: '方洲AI 是一层套在外部 Agent 之上的跨境外联业务壳层，负责统一任务、统一记忆、统一回填与资产沉淀。',
   productPoints: '筋膜枪 / 恢复类设备 / 居家健身',
-  cooperationModes: '寄样 + 佣金，优先长期合作，默认不接受固定坑位费',
-  campaignProof: '首轮重点验证 TikTok / Instagram / YouTube / Deal 站的外联效率和回填闭环。',
-  faq: '是否支持寄样、佣金边界、物流周期、品牌卖点、竞品差异。',
+  cooperationModes: '寄样 + 佣金，优先长期合作，不接受固定坑位费。',
+  campaignProof: '重点验证 TikTok、Instagram、YouTube 与 Deal 站的冷启动合作效率。',
+  faq: '是否支持寄样、佣金边界、物流周期、品牌差异点、竞品对比。',
 }
 
 const channelConfigSeed = {
@@ -79,8 +73,8 @@ const channelConfigSeed = {
 
 const settingsSeed = {
   englishTone: '自然专业',
-  followupRule: '48 小时后自动提醒复查，复杂对话进入人工接管',
-  summaryRule: '每次回填后自动生成摘要、下一步动作和资产更新建议',
+  followupRule: '48 小时后自动提醒复查，复杂会话升级为人工接管。',
+  summaryRule: '每次回填后自动生成摘要、下一步动作和资产更新建议。',
 }
 
 async function apiFetch(path, options = {}, token = '') {
@@ -100,6 +94,23 @@ async function apiFetch(path, options = {}, token = '') {
   return response.json()
 }
 
+function localPreferenceKey(brandId) {
+  return `fangzhou_shell_preferences_${brandId}`
+}
+
+function readLocalPreferences(brandId) {
+  try {
+    const raw = localStorage.getItem(localPreferenceKey(brandId))
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+function writeLocalPreferences(brandId, payload) {
+  localStorage.setItem(localPreferenceKey(brandId), JSON.stringify(payload))
+}
+
 function formatDateTime(value) {
   if (!value) return '-'
   const date = new Date(value)
@@ -117,17 +128,19 @@ function shortDate(value) {
 function normalizeTaskStatus(status) {
   if (!status) return '草稿'
   if (String(status).includes('完成')) return '已完成'
-  if (String(status).includes('执行中')) return '执行中'
+  if (String(status).includes('执行')) return '执行中'
   if (String(status).includes('回填')) return '待回填'
   if (String(status).includes('生成')) return '待发送'
-  return status
+  return String(status)
 }
 
 function parseInstruction(task) {
-  const lines = String(task?.instruction || '').split('\n')
+  const text = String(task?.instruction || '')
+  const lines = text.split('\n')
   const getValue = (label) => {
-    const line = lines.find((item) => item.startsWith(`${label}：`))
-    return line ? line.slice(label.length + 1).trim() : ''
+    const line = lines.find((item) => item.startsWith(`${label}：`) || item.startsWith(`${label}:`))
+    if (!line) return ''
+    return line.slice(line.indexOf('：') >= 0 ? line.indexOf('：') + 1 : line.indexOf(':') + 1).trim()
   }
 
   return {
@@ -149,19 +162,24 @@ function promptBlueprint(prompt) {
   if (lowered.includes('tiktok')) targets.push('TikTok')
   if (lowered.includes('instagram')) targets.push('Instagram')
   if (lowered.includes('youtube')) targets.push('YouTube')
-  if (text.includes('Deal')) targets.push('Deal 站')
+  if (text.includes('Deal') || text.includes('deal')) targets.push('Deal 站')
   if (text.includes('媒体') || lowered.includes('pr')) targets.push('媒体 / PR')
-  if (targets.length === 0) targets.push('TikTok', 'Instagram')
+  if (!targets.length) targets.push('TikTok', 'Instagram')
 
   const objectType =
-    text.includes('Deal') ? 'Deal 站 / 导购站'
-      : text.includes('媒体') || lowered.includes('pr') ? '媒体 / PR'
-        : text.includes('联盟') ? '联盟客 / Affiliate'
+    text.includes('Deal') || text.includes('deal')
+      ? 'Deal 站 / 导购站'
+      : text.includes('媒体') || lowered.includes('pr')
+        ? '媒体 / PR'
+        : text.includes('联盟')
+          ? '联盟客 / Affiliate'
           : '达人 / 创作者'
 
   const workflow =
-    text.includes('话术') || text.includes('回复') ? 'AI 辅助回复'
-      : text.includes('名单') || text.includes('搜集') ? '外部 Agent 搜集 + 人工复核'
+    text.includes('话术') || text.includes('回复')
+      ? 'AI辅助回复'
+      : text.includes('名单') || text.includes('整理') || text.includes('搜索')
+        ? '外部 Agent 搜集 + 人工复核'
         : '外部 Agent 搜集 + 云端回填'
 
   return {
@@ -181,6 +199,7 @@ function buildMockAssets(task) {
     {
       id: `mock-${task.id}-1`,
       taskId: task.id,
+      brandId: task.brandId,
       name: 'Mia Moves',
       type: '达人',
       platform: 'TikTok',
@@ -188,14 +207,16 @@ function buildMockAssets(task) {
       email: 'mia@example.com',
       phone: '15551234567',
       fitScore: 92,
+      followers: '12.4 万',
       contact: 'Instagram DM',
       status: '待回复',
-      handling: 'AI 辅助回复',
+      handling: 'AI辅助回复',
       relationship: '首次沟通',
-      lastAction: '对方回复可合作，但提出固定费用',
-      nextAction: '给出 3 版回复建议，判断是否人工接管',
+      lastAction: '对方提出固定费用合作',
+      nextAction: '生成 3 版回复并判断是否接管',
       reminderAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-      note: `${titleHint} 的高匹配对象，适合优先推进。`,
+      reminderNote: '明天跟进报价策略',
+      notes: `${titleHint} 的高匹配对象，适合优先推进。`,
       conversation: [
         { role: 'agent', text: 'Hi Mia, we are exploring a sample + commission collaboration for the US fitness audience.' },
         { role: 'external', text: 'I can do it, but I usually charge a fixed fee. What is your budget?' },
@@ -204,65 +225,24 @@ function buildMockAssets(task) {
     {
       id: `mock-${task.id}-2`,
       taskId: task.id,
+      brandId: task.brandId,
       name: 'Wellness Weekly',
       type: '媒体 / PR',
       platform: 'Editorial',
       profileUrl: 'https://www.google.com/search?q=wellness+weekly',
       email: 'editor@wellnessweekly.com',
       fitScore: 84,
+      followers: '媒体',
       contact: 'Gmail',
       status: '待接管',
       handling: '人工接管',
       relationship: '索要品牌资料',
       lastAction: '要求提供品牌背景与过往案例',
-      nextAction: '调用品牌资料页内容，补发品牌介绍与 campaign case',
+      nextAction: '补品牌资料后继续推进',
       reminderAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
-      note: '媒体型对象，需要更完整的资料底座。',
-      conversation: [
-        { role: 'external', text: 'Please share your brand background, KPI expectations and previous campaign examples.' },
-      ],
-    },
-    {
-      id: `mock-${task.id}-3`,
-      taskId: task.id,
-      name: 'Gym Deal Hunter',
-      type: 'Deal 站',
-      platform: 'Deal Site',
-      profileUrl: 'https://www.google.com/search?q=gym+deal+hunter',
-      email: 'ops@gymdealhunter.com',
-      fitScore: 79,
-      contact: 'Gmail',
-      status: '已触达',
-      handling: '自动触达',
-      relationship: '已进入候选池',
-      lastAction: '首轮触达已发出',
-      nextAction: '48 小时后自动检查是否回复',
-      reminderAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
-      note: '标准化对象，适合自动化处理。',
-      conversation: [
-        { role: 'agent', text: 'Hello, we are launching a new recovery product and would love to explore a feature on your site.' },
-      ],
-    },
-    {
-      id: `mock-${task.id}-4`,
-      taskId: task.id,
-      name: 'PowerCore Jay',
-      type: 'YouTube 测评',
-      platform: 'YouTube',
-      profileUrl: 'https://www.youtube.com/results?search_query=powercore+jay',
-      email: 'jay@powercore.studio',
-      fitScore: 88,
-      contact: 'Gmail',
-      status: '已合作',
-      handling: '人工接管',
-      relationship: '已建立合作',
-      lastAction: '样品与佣金方案已确认',
-      nextAction: '推进履约与发布时间',
-      reminderAt: null,
-      note: '可作为后续案例与素材沉淀。',
-      conversation: [
-        { role: 'external', text: 'Sounds good. I am happy with gifted product + commission. Let us move forward.' },
-      ],
+      reminderNote: '补一页品牌介绍与 KPI',
+      notes: '媒体对象，需要更完整的资料底座。',
+      conversation: [{ role: 'external', text: 'Please share your brand background, KPI expectations and previous campaign examples.' }],
     },
   ]
 }
@@ -270,24 +250,27 @@ function buildMockAssets(task) {
 function buildSuggestionSet(asset) {
   if (!asset) return []
 
-  const latestIncoming = asset.conversation.filter((item) => item.role === 'external').at(-1)?.text || ''
-  if (/fee|budget|charge/i.test(latestIncoming)) {
+  const latestIncoming = asset.conversation?.filter((item) => item.role === 'external').at(-1)?.text || ''
+  if (/fee|budget|charge|报价|费用/i.test(latestIncoming)) {
     return [
-      { title: '控制预算版', body: '感谢回复。我们这轮更偏向寄样 + 佣金合作，当前暂不接受固定费用。如果你愿意，我们可以先从一轮测试合作开始。' },
+      { title: '压预算版', body: '感谢回复。我们这轮更偏向寄样 + 佣金合作，当前暂不接受固定费用。如果你愿意，我们可以先从一轮测试合作开始。' },
       { title: '继续推进版', body: '谢谢你给出报价。为了确保这轮合作匹配，我先把 deliverables 和 campaign 目标发给你，你看过后我们再一起确认方式。' },
-      { title: '转人工版', body: '这个对象已经触碰合作约束，建议转人工接管，由你决定是否放宽边界。' },
+      { title: '建议接管', body: '这个对象已经触及合作约束，建议转人工接管，由你决定是否放宽边界。' },
     ]
   }
 
-  if (/brand background|campaign|examples/i.test(latestIncoming)) {
+  if (/brand background|campaign|examples|案例|背景/i.test(latestIncoming)) {
     return [
-      { title: '补品牌资料版', body: '当然可以。我先把品牌背景、产品卖点和过往合作方式整理给你，如果方向一致，我们再确认下一步节奏。' },
+      { title: '品牌资料版', body: '当然可以。我先把品牌背景、产品卖点和过往合作方式整理给你，如果方向一致，我们再确认下一步节奏。' },
       { title: '压缩沟通版', body: '我先发你一页简版资料：品牌定位、产品卖点和本次合作目标。你看过后我们就能快速判断是否值得推进。' },
-      { title: '人工接管提醒', body: '这类问题适合调用品牌资料页内容，并由人工做最后确认。' },
+      { title: '建议接管', body: '这类问题适合调品牌资料页内容，并由人工做最后确认。' },
     ]
   }
 
-  return [{ title: '常规跟进版', body: '收到，我这边先整理更完整的信息给你。你方便的话，我们本周继续往下推进。' }]
+  return [
+    { title: '常规跟进版', body: '收到，我这边先整理更完整的信息给你。你方便的话，我们本周继续往下推进。' },
+    { title: '确认意向版', body: '感谢回复。为了让合作更高效，我先确认一下你更偏好的合作方式和时间节奏。' },
+  ]
 }
 
 function assetStageCounts(assets) {
@@ -313,7 +296,7 @@ function buildEmailDraft(asset, brandProfile, channelConfig) {
     `Hi ${asset?.name || 'there'},`,
     '',
     `I am reaching out about a potential collaboration related to ${brandProfile.productPoints}.`,
-    `We usually work on ${brandProfile.cooperationModes}.`,
+    `Our current cooperation mode is ${brandProfile.cooperationModes}.`,
     '',
     brandProfile.intro,
     '',
@@ -330,9 +313,9 @@ function buildAssetLinks(asset, brandProfile, channelConfig) {
   const whatsappUrl = asset?.phone ? `https://wa.me/${String(asset.phone).replace(/\D/g, '')}?text=${summary}` : ''
   const profileUrl =
     asset?.profileUrl
-      || (asset?.platform === 'YouTube' ? `https://www.youtube.com/results?search_query=${encodeURIComponent(asset.name)}` : '')
-      || (asset?.platform === 'TikTok' ? `https://www.tiktok.com/search?q=${encodeURIComponent(asset.name)}` : '')
-      || `https://www.google.com/search?q=${encodeURIComponent(asset?.name || '')}`
+    || (asset?.platform === 'YouTube' ? `https://www.youtube.com/results?search_query=${encodeURIComponent(asset.name)}` : '')
+    || (asset?.platform === 'TikTok' ? `https://www.tiktok.com/search?q=${encodeURIComponent(asset.name)}` : '')
+    || `https://www.google.com/search?q=${encodeURIComponent(asset?.name || '')}`
 
   return { gmailUrl, whatsappUrl, profileUrl }
 }
@@ -356,32 +339,44 @@ function openUrl(url) {
   window.open(url, '_blank', 'noopener,noreferrer')
 }
 
-function localPreferenceKey(brandId) {
-  return `fangzhou_shell_preferences_${brandId}`
+function toDatetimeInputValue(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+  return local.toISOString().slice(0, 16)
 }
 
-function readLocalPreferences(brandId) {
-  try {
-    const raw = localStorage.getItem(localPreferenceKey(brandId))
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    return null
+function fromDatetimeInputValue(value) {
+  if (!value) return null
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date.toISOString()
+}
+
+function stageClass(status) {
+  const map = {
+    已抓取: 'slate',
+    初筛通过: 'blue',
+    已触达: 'purple',
+    待回复: 'amber',
+    洽谈中: 'green',
+    已合作: 'green-strong',
+    待接管: 'red',
   }
-}
-
-function writeLocalPreferences(brandId, payload) {
-  localStorage.setItem(localPreferenceKey(brandId), JSON.stringify(payload))
+  return map[status] || 'slate'
 }
 
 function App() {
-  const [bootstrap, setBootstrap] = useState({ brands: [], modules: [], demoCredentials: loginSeed, storageMode: 'memory', authMode: 'demo' })
+  const [bootstrap, setBootstrap] = useState({ brands: [], demoCredentials: loginSeed, storageMode: 'memory', authMode: 'demo' })
   const [token, setToken] = useState(() => localStorage.getItem('fangzhou_shell_token') || '')
   const [currentUser, setCurrentUser] = useState(null)
   const [dashboard, setDashboard] = useState(emptyDashboard)
   const [brandId, setBrandId] = useState('')
   const [pageId, setPageId] = useState('overview')
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [activeTaskId, setActiveTaskId] = useState('')
   const [selectedAssetId, setSelectedAssetId] = useState('')
+  const [selectedAssetIds, setSelectedAssetIds] = useState([])
   const [taskSearch, setTaskSearch] = useState('')
   const [assetSearch, setAssetSearch] = useState('')
   const [conversationSearch, setConversationSearch] = useState('')
@@ -397,10 +392,19 @@ function App() {
   const [channelConfig, setChannelConfig] = useState(channelConfigSeed)
   const [settingsState, setSettingsState] = useState(settingsSeed)
   const [localAssetsByTask, setLocalAssetsByTask] = useState({})
+  const [assetEditor, setAssetEditor] = useState({ status: '', handling: '', nextAction: '', reminderAt: '', reminderNote: '' })
+  const [bulkAction, setBulkAction] = useState({ status: '', handling: '', nextAction: '', reminderAt: '', reminderNote: '' })
+  const [notice, setNotice] = useState('')
 
   useEffect(() => {
     localStorage.setItem('fangzhou_shell_token', token)
   }, [token])
+
+  useEffect(() => {
+    if (!notice) return undefined
+    const timer = window.setTimeout(() => setNotice(''), 2200)
+    return () => window.clearTimeout(timer)
+  }, [notice])
 
   async function loadBootstrap() {
     const data = await apiFetch('/api/bootstrap')
@@ -461,7 +465,7 @@ function App() {
       const next = { ...prev }
       dashboard.tasks.forEach((task) => {
         const realAssets = dashboard.leadsByTask?.[task.id] || []
-        if (realAssets.length === 0 && !next[task.id]) {
+        if (!realAssets.length && !next[task.id]) {
           next[task.id] = buildMockAssets(task)
           changed = true
         }
@@ -500,27 +504,25 @@ function App() {
     const result = {}
     tasks.forEach((task) => {
       const realAssets = dashboard.leadsByTask?.[task.id] || []
-      result[task.id] = realAssets.length > 0 ? realAssets : (localAssetsByTask[task.id] || [])
+      result[task.id] = realAssets.length ? realAssets : (localAssetsByTask[task.id] || [])
     })
     return result
   }, [dashboard.leadsByTask, localAssetsByTask, tasks])
 
-  const activeAssets = useMemo(
-    () => (activeTask ? taskAssetsMap[activeTask.id] || [] : []),
-    [activeTask, taskAssetsMap],
-  )
+  const activeAssets = useMemo(() => (activeTask ? taskAssetsMap[activeTask.id] || [] : []), [activeTask, taskAssetsMap])
 
   const filteredAssets = useMemo(() => {
     if (!assetSearch.trim()) return activeAssets
     const query = assetSearch.trim().toLowerCase()
     return activeAssets.filter((asset) =>
-      [asset.name, asset.type, asset.platform, asset.contact, asset.status, asset.handling].join(' ').toLowerCase().includes(query),
+      [asset.name, asset.type, asset.platform, asset.contact, asset.status, asset.handling, asset.nextAction].join(' ').toLowerCase().includes(query),
     )
   }, [activeAssets, assetSearch])
 
   useEffect(() => {
     if (!filteredAssets.length) {
       setSelectedAssetId('')
+      setSelectedAssetIds([])
       return
     }
     if (!selectedAssetId || !filteredAssets.some((asset) => asset.id === selectedAssetId)) {
@@ -532,6 +534,17 @@ function App() {
     () => activeAssets.find((asset) => asset.id === selectedAssetId) || filteredAssets[0] || null,
     [activeAssets, filteredAssets, selectedAssetId],
   )
+
+  useEffect(() => {
+    if (!selectedAsset) return
+    setAssetEditor({
+      status: selectedAsset.status || '',
+      handling: selectedAsset.handling || '',
+      nextAction: selectedAsset.nextAction || '',
+      reminderAt: toDatetimeInputValue(selectedAsset.reminderAt),
+      reminderNote: selectedAsset.reminderNote || '',
+    })
+  }, [selectedAsset])
 
   const allConversationAssets = useMemo(
     () =>
@@ -548,7 +561,7 @@ function App() {
     if (!conversationSearch.trim()) return allConversationAssets
     const query = conversationSearch.trim().toLowerCase()
     return allConversationAssets.filter((asset) =>
-      [asset.name, asset.platform, asset.status, asset.handling, asset.lastAction].join(' ').toLowerCase().includes(query),
+      [asset.name, asset.platform, asset.status, asset.handling, asset.lastAction, asset.taskTitle].join(' ').toLowerCase().includes(query),
     )
   }, [allConversationAssets, conversationSearch])
 
@@ -563,8 +576,13 @@ function App() {
   const promptDraft = useMemo(() => promptBlueprint(taskPrompt), [taskPrompt])
   const activeTaskSummary = useMemo(() => (activeTask ? parseInstruction(activeTask) : null), [activeTask])
   const selectedSuggestions = useMemo(() => buildSuggestionSet(selectedConversationAsset), [selectedConversationAsset])
+  const selectedLinks = useMemo(() => buildAssetLinks(selectedAsset, brandProfile, channelConfig), [selectedAsset, brandProfile, channelConfig])
+  const selectedConversationLinks = useMemo(
+    () => buildAssetLinks(selectedConversationAsset, brandProfile, channelConfig),
+    [selectedConversationAsset, brandProfile, channelConfig],
+  )
 
-  function updateLocalAsset(taskId, assetId, updater) {
+  function setLocalAsset(taskId, assetId, updater) {
     setLocalAssetsByTask((prev) => ({
       ...prev,
       [taskId]: (prev[taskId] || []).map((asset) => (asset.id === assetId ? updater(asset) : asset)),
@@ -615,6 +633,7 @@ function App() {
     setDashboard(emptyDashboard)
     setActiveTaskId('')
     setSelectedAssetId('')
+    setSelectedAssetIds([])
     setPageId('overview')
   }
 
@@ -624,7 +643,7 @@ function App() {
     setActiveTaskId(nextTaskId || dash.activeTaskId || dash.tasks?.[0]?.id || '')
   }
 
-  async function savePreferences() {
+  async function savePreferences(kind) {
     setLoading(true)
     setError('')
     const payload = {
@@ -637,9 +656,10 @@ function App() {
     try {
       await apiFetch('/api/preferences', { method: 'PUT', body: JSON.stringify(payload) }, token)
       writeLocalPreferences(brandId, payload)
-    } catch (saveError) {
+      setNotice(`${kind}已保存`)
+    } catch {
       writeLocalPreferences(brandId, payload)
-      setError('当前先保存到本地浏览器，等线上后端更新后会继续走云端保存。')
+      setNotice(`${kind}已先保存到浏览器，本地继续可用`)
     } finally {
       setLoading(false)
     }
@@ -654,17 +674,22 @@ function App() {
     setLoading(true)
     setError('')
     try {
-      const payload = await apiFetch('/api/tasks', {
-        method: 'POST',
-        body: JSON.stringify({
-          brandId,
-          moduleId: 'traffic-acquisition',
-          instruction: taskPrompt.trim(),
-        }),
-      }, token)
+      const payload = await apiFetch(
+        '/api/tasks',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            brandId,
+            moduleId: 'traffic-acquisition',
+            instruction: taskPrompt.trim(),
+          }),
+        },
+        token,
+      )
       await reloadDashboard(payload.task.id)
       setPageId('tasks')
       setRefillDraft('')
+      setNotice('任务已创建')
     } catch (taskError) {
       setError(taskError.message)
     } finally {
@@ -679,6 +704,7 @@ function App() {
     try {
       await apiFetch(`/api/tasks/${activeTask.id}/submit`, { method: 'POST' }, token)
       await reloadDashboard(activeTask.id)
+      setNotice('任务已标记为外部执行中')
     } catch (submitError) {
       setError(submitError.message)
     } finally {
@@ -693,6 +719,7 @@ function App() {
     try {
       await apiFetch(`/api/tasks/${activeTask.id}/mark-refill`, { method: 'POST' }, token)
       await reloadDashboard(activeTask.id)
+      setNotice('任务已进入待回填')
     } catch (markError) {
       setError(markError.message)
     } finally {
@@ -709,12 +736,17 @@ function App() {
     setLoading(true)
     setError('')
     try {
-      await apiFetch(`/api/tasks/${activeTask.id}/refill`, {
-        method: 'POST',
-        body: JSON.stringify({ rawText: refillDraft }),
-      }, token)
+      await apiFetch(
+        `/api/tasks/${activeTask.id}/refill`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ rawText: refillDraft }),
+        },
+        token,
+      )
       await reloadDashboard(activeTask.id)
       setRefillDraft('')
+      setNotice('回填已写入系统')
     } catch (refillError) {
       setError(refillError.message)
     } finally {
@@ -740,15 +772,16 @@ function App() {
         )
         await reloadDashboard(selectedConversationAsset.taskId)
       } else {
-        updateLocalAsset(selectedConversationAsset.taskId, selectedConversationAsset.id, (asset) => ({
+        setLocalAsset(selectedConversationAsset.taskId, selectedConversationAsset.id, (asset) => ({
           ...asset,
-          status: '洽谈中',
+          status: asset.status === '待回复' ? '洽谈中' : asset.status,
           lastAction: '已发送回复',
           nextAction: '等待对方下一轮反馈',
-          conversation: [...asset.conversation, { role: 'agent', text: replyDraft.trim() }],
+          conversation: [...(asset.conversation || []), { role: 'agent', text: replyDraft.trim() }],
         }))
       }
       setReplyDraft('')
+      setNotice('回复已写入会话')
     } catch (replyError) {
       setError(replyError.message)
     } finally {
@@ -760,6 +793,7 @@ function App() {
     if (!activeTask?.executionPackage?.content) return
     try {
       await copyText(activeTask.executionPackage.content)
+      setNotice('执行包已复制')
     } catch (copyError) {
       setError(copyError.message)
     }
@@ -768,102 +802,171 @@ function App() {
   function downloadExecutionPackage() {
     if (!activeTask?.executionPackage?.content) return
     downloadText(activeTask.executionPackage.exportName || `${activeTask.id}.txt`, activeTask.executionPackage.content)
+    setNotice('执行包已下载')
+  }
+
+  async function launchExternal(baseUrl, label) {
+    if (!activeTask?.executionPackage?.content) {
+      setError('当前没有可执行任务包。')
+      return
+    }
+
+    try {
+      await copyText(activeTask.executionPackage.content)
+      openUrl(baseUrl)
+      setNotice(`已复制执行包并打开 ${label}`)
+    } catch (launchError) {
+      setError(launchError.message)
+    }
+  }
+
+  async function applyLeadUpdate(targetLeadId, changes) {
+    if (!activeTask) return
+    const hasRealAssets = (dashboard.leadsByTask?.[activeTask.id] || []).length > 0
+
+    if (hasRealAssets) {
+      await apiFetch(
+        `/api/leads/${targetLeadId}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify(changes),
+        },
+        token,
+      )
+      await reloadDashboard(activeTask.id)
+      return
+    }
+
+    setLocalAsset(activeTask.id, targetLeadId, (asset) => ({
+      ...asset,
+      ...changes,
+      reminderAt: changes.reminderAt !== undefined ? changes.reminderAt : asset.reminderAt,
+      reminderNote: changes.reminderNote !== undefined ? changes.reminderNote : asset.reminderNote,
+      lastAction: '已更新资产状态',
+    }))
+  }
+
+  async function saveSelectedAsset() {
+    if (!selectedAsset) return
+    setLoading(true)
+    setError('')
+    try {
+      await applyLeadUpdate(selectedAsset.id, {
+        status: assetEditor.status,
+        handling: assetEditor.handling,
+        nextAction: assetEditor.nextAction,
+        reminderAt: fromDatetimeInputValue(assetEditor.reminderAt),
+        reminderNote: assetEditor.reminderNote,
+      })
+      setNotice('资产已更新')
+    } catch (updateError) {
+      setError(updateError.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function applyBulkUpdate() {
+    if (!selectedAssetIds.length || !activeTask) return
+    const hasRealAssets = (dashboard.leadsByTask?.[activeTask.id] || []).length > 0
+    const payload = {
+      ids: selectedAssetIds,
+      status: bulkAction.status || undefined,
+      handling: bulkAction.handling || undefined,
+      nextAction: bulkAction.nextAction || undefined,
+      reminderAt: bulkAction.reminderAt ? fromDatetimeInputValue(bulkAction.reminderAt) : undefined,
+      reminderNote: bulkAction.reminderNote || undefined,
+    }
+
+    setLoading(true)
+    setError('')
+    try {
+      if (hasRealAssets) {
+        await apiFetch('/api/leads/bulk-update', { method: 'POST', body: JSON.stringify(payload) }, token)
+        await reloadDashboard(activeTask.id)
+      } else {
+        selectedAssetIds.forEach((id) => {
+          setLocalAsset(activeTask.id, id, (asset) => ({
+            ...asset,
+            status: payload.status || asset.status,
+            handling: payload.handling || asset.handling,
+            nextAction: payload.nextAction || asset.nextAction,
+            reminderAt: payload.reminderAt !== undefined ? payload.reminderAt : asset.reminderAt,
+            reminderNote: payload.reminderNote !== undefined ? payload.reminderNote : asset.reminderNote,
+            lastAction: '已批量更新资产',
+          }))
+        })
+      }
+      setBulkAction({ status: '', handling: '', nextAction: '', reminderAt: '', reminderNote: '' })
+      setSelectedAssetIds([])
+      setNotice('批量操作已应用')
+    } catch (bulkError) {
+      setError(bulkError.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function toggleAssetSelection(assetId) {
+    setSelectedAssetIds((prev) => (prev.includes(assetId) ? prev.filter((id) => id !== assetId) : [...prev, assetId]))
+  }
+
+  function selectAllVisibleAssets() {
+    setSelectedAssetIds((prev) => (prev.length === filteredAssets.length ? [] : filteredAssets.map((asset) => asset.id)))
   }
 
   function renderOverviewPage() {
     return (
-      <div className="page-stack">
-        <section className="hero-band">
+      <div className="panel-stack">
+        <section className="hero-panel">
           <div className="hero-copy">
-            <p className="eyebrow">External Agent Shell</p>
-            <h1>方洲AI 外联业务壳层</h1>
+            <p className="hero-kicker">Outreach Operating Layer</p>
+            <h1>不是再造一个 Agent，而是把所有 Agent 接进你的外联业务里。</h1>
             <p>
-              不是再做一个 Agent，而是把外部 Agent 包进你的跨境业务流程里。
-              所有任务、会话、摘要、结果和合作关系，统一沉淀在云端。
+              方洲AI 的价值不在于替代 OpenCloud、Codex 或人工，而在于把任务、会话、回填、品牌资料和资产沉淀统一到同一层。
+              这样每一次触达都不会散在不同工具里。
             </p>
           </div>
-          <div className="hero-grid">
-            <article>
-              <span>云端记忆层</span>
-              <strong>会话 / 约束 / 资产统一沉淀</strong>
-            </article>
-            <article>
-              <span>外部执行层</span>
-              <strong>OpenCloud / Codex / 人工都能接</strong>
-            </article>
-            <article>
-              <span>业务回填层</span>
-              <strong>回填后自动生成摘要与下一步动作</strong>
-            </article>
+          <div className="hero-facts">
+            <article><span>今日任务</span><strong>{dashboard.overview.todayTaskCount}</strong></article>
+            <article><span>待回填</span><strong>{dashboard.overview.pendingRefillCount}</strong></article>
+            <article><span>待处理提醒</span><strong>{dashboard.overview.reminderCount}</strong></article>
           </div>
         </section>
 
-        <section className="metric-strip">
-          <article>
-            <span>执行中任务</span>
-            <strong>{dashboard.overview.todayTaskCount}</strong>
-          </article>
-          <article>
-            <span>外联推进中</span>
-            <strong>{dashboard.overview.outreachInProgress}</strong>
-          </article>
-          <article>
-            <span>已沉淀资产</span>
-            <strong>{dashboard.dataCenter.influencerPool + dashboard.dataCenter.dealSitePool + dashboard.dataCenter.mediaPool}</strong>
-          </article>
-          <article>
-            <span>待回填</span>
-            <strong>{dashboard.overview.pendingRefillCount}</strong>
-          </article>
+        <section className="stats-grid">
+          <article className="stat-card"><span>已沉淀资产</span><strong>{dashboard.dataCenter.influencerPool + dashboard.dataCenter.dealSitePool + dashboard.dataCenter.mediaPool}</strong><small>达人、Deal 站、媒体统一沉淀</small></article>
+          <article className="stat-card"><span>外联推进中</span><strong>{dashboard.overview.outreachInProgress}</strong><small>仍在推进的合作对象</small></article>
+          <article className="stat-card"><span>高意向线索</span><strong>{dashboard.overview.warmLeads}</strong><small>已经回复或进入谈判</small></article>
+          <article className="stat-card"><span>历史任务</span><strong>{dashboard.dataCenter.historyTaskCount}</strong><small>全部任务都能回看复盘</small></article>
         </section>
 
-        <div className="two-column">
-          <section className="surface">
-            <div className="section-head">
-              <div>
-                <p className="eyebrow">系统价值</p>
-                <h2>为什么不用直接 Agent，而要用这层壳</h2>
-              </div>
+        <div className="content-grid two-up">
+          <section className="workspace-card">
+            <div className="section-title">
+              <p>这层壳真正解决什么</p>
+              <h2>别人直接用 Agent，也很难替代这层系统。</h2>
             </div>
-            <div className="value-grid">
-              <article>
-                <strong>统一上下文</strong>
-                <p>不用每次重新告诉 Agent 你的品牌、SKU、合作边界和历史沟通。</p>
-              </article>
-              <article>
-                <strong>统一回填</strong>
-                <p>所有执行结果都回到同一个任务和资产池里，而不是散落在不同窗口。</p>
-              </article>
-              <article>
-                <strong>统一资产沉淀</strong>
-                <p>达人、媒体、Deal 站、联盟客都会沉淀成品牌自己的外联资产。</p>
-              </article>
-              <article>
-                <strong>统一下一步动作</strong>
-                <p>系统自动给出后续建议、提醒和接管判断，不让沟通断掉。</p>
-              </article>
+            <div className="bullet-grid">
+              <article><strong>统一任务</strong><p>把自然语言目标转成结构化执行包，直接送去外部 Agent 跑。</p></article>
+              <article><strong>统一记忆</strong><p>品牌资料、沟通约束、历史会话和回填结果都统一留在云端。</p></article>
+              <article><strong>统一回填</strong><p>外部 Agent 跑完后，不是散落在聊天窗口里，而是回到任务与资产上。</p></article>
+              <article><strong>统一资产</strong><p>达人、媒体、Deal 站、联盟客都会积累为品牌自己的外联资产池。</p></article>
             </div>
           </section>
 
-          <section className="surface">
-            <div className="section-head">
-              <div>
-                <p className="eyebrow">最近结果</p>
-                <h2>已经跑出来的交付</h2>
-              </div>
+          <section className="workspace-card">
+            <div className="section-title">
+              <p>最近结果</p>
+              <h2>已经回填回来的任务</h2>
             </div>
             <div className="timeline-list">
-              {dashboard.recentResults.length ? (
-                dashboard.recentResults.map((item) => (
-                  <article key={item.id} className="timeline-row">
-                    <span>{shortDate(item.completedAt)}</span>
-                    <strong>{parseInstruction({ instruction: item.instruction }).title}</strong>
-                    <p>{item.summary || '已完成回填。'}</p>
-                  </article>
-                ))
-              ) : (
-                <article className="empty-state">还没有最近结果，创建一个新任务后这里会展示回填摘要。</article>
-              )}
+              {dashboard.recentResults.length ? dashboard.recentResults.map((item) => (
+                <article key={item.id} className="timeline-item">
+                  <header><strong>{parseInstruction({ instruction: item.instruction }).title}</strong><span>{shortDate(item.completedAt)}</span></header>
+                  <p>{item.summary || '已完成回填。'}</p>
+                </article>
+              )) : <div className="empty-box">还没有最近结果，先创建一个任务再推进一次完整回填。</div>}
             </div>
           </section>
         </div>
@@ -872,149 +975,109 @@ function App() {
   }
 
   function renderTasksPage() {
+    const counts = assetStageCounts(activeAssets)
     return (
-      <div className="page-stack">
-        <div className="two-column wide-right">
-          <section className="surface">
-            <div className="section-head">
-              <div>
-                <p className="eyebrow">创建任务</p>
-                <h2>先告诉系统你要推进什么合作</h2>
-              </div>
+      <div className="panel-stack">
+        <div className="content-grid two-up wide-right">
+          <section className="workspace-card">
+            <div className="section-title">
+              <p>创建任务</p>
+              <h2>直接描述目标，系统帮你生成执行任务。</h2>
             </div>
 
-            <label className="field">
+            <label className="field-block">
               <span>自然语言任务输入</span>
-              <textarea
-                className="prompt-box"
-                value={taskPrompt}
-                onChange={(event) => setTaskPrompt(event.target.value)}
-                placeholder="例如：帮我创建一个美国健身类 TikTok 达人首轮触达任务，目标 50 人，佣金不超过 14%。"
-              />
+              <textarea className="textarea large" value={taskPrompt} onChange={(event) => setTaskPrompt(event.target.value)} placeholder="例如：帮我创建一个美国健身类 TikTok 达人首轮触达任务，目标 50 位对象，佣金不超过 14%。" />
             </label>
 
             <div className="chip-row">
               {quickExamples.map((item) => (
-                <button key={item} type="button" className="soft-chip" onClick={() => setTaskPrompt(item)}>
+                <button key={item} type="button" className="chip-button" onClick={() => setTaskPrompt(item)}>
                   {item}
                 </button>
               ))}
             </div>
 
             <div className="draft-grid">
-              <article>
-                <span>对象类型</span>
-                <strong>{promptDraft.objectType}</strong>
-              </article>
-              <article>
-                <span>建议工作流</span>
-                <strong>{promptDraft.workflow}</strong>
-              </article>
-              <article>
-                <span>目标平台</span>
-                <strong>{promptDraft.targets.join(' / ')}</strong>
-              </article>
+              <article><span>对象类型</span><strong>{promptDraft.objectType}</strong></article>
+              <article><span>执行方式</span><strong>{promptDraft.workflow}</strong></article>
+              <article><span>目标平台</span><strong>{promptDraft.targets.join(' / ')}</strong></article>
+              <article><span>沉淀内容</span><strong>{promptDraft.memory.join(' / ')}</strong></article>
             </div>
 
-            <div className="surface-note">
-              <strong>这层壳会自动附带的上下文</strong>
-              <p>{promptDraft.memory.join(' · ')}</p>
-            </div>
-
-            <div className="action-row">
-              <button type="button" className="primary-button" onClick={createTask} disabled={loading}>
-                {loading ? '处理中...' : '创建任务'}
-              </button>
+            <div className="action-bar">
+              <button type="button" className="primary-button" onClick={createTask} disabled={loading}>{loading ? '创建中...' : '创建任务'}</button>
             </div>
           </section>
 
-          <section className="surface">
-            <div className="section-head">
-              <div>
-                <p className="eyebrow">任务编排台</p>
-                <h2>{activeTaskSummary?.title || '还没有选中任务'}</h2>
-              </div>
-              <span className="status-pill">{normalizeTaskStatus(activeTask?.status)}</span>
+          <section className="workspace-card">
+            <div className="section-title">
+              <p>当前任务</p>
+              <h2>{activeTaskSummary?.title || '先从左侧选择一个任务'}</h2>
             </div>
 
             {activeTask ? (
-              <div className="task-orchestration">
-                <div className="meta-grid">
-                  <article>
-                    <span>产品 / SKU</span>
-                    <strong>{activeTaskSummary.product}</strong>
-                  </article>
-                  <article>
-                    <span>市场 / 方向</span>
-                    <strong>{`${activeTaskSummary.market} / ${activeTaskSummary.direction}`}</strong>
-                  </article>
-                  <article>
-                    <span>目标平台</span>
-                    <strong>{activeTaskSummary.platforms}</strong>
-                  </article>
-                  <article>
-                    <span>触达方式</span>
-                    <strong>{activeTaskSummary.outreach}</strong>
-                  </article>
+              <>
+                <div className="summary-grid">
+                  <article><span>产品</span><strong>{activeTaskSummary.product}</strong></article>
+                  <article><span>市场</span><strong>{activeTaskSummary.market}</strong></article>
+                  <article><span>平台</span><strong>{activeTaskSummary.platforms}</strong></article>
+                  <article><span>约束</span><strong>{activeTaskSummary.constraints}</strong></article>
                 </div>
 
-                <section className="mini-surface">
-                  <div className="section-head compact">
-                    <div>
-                      <p className="eyebrow">执行说明</p>
-                      <h3>系统给外部 Agent 的任务包</h3>
-                    </div>
-                  </div>
-                  <div className="package-text">
-                    <strong>{activeTask.executionPackage?.title || '执行方案'}</strong>
-                    <p>{activeTask.executionPackage?.externalStatus || '尚未发送到外部执行端'}</p>
-                    <pre>{activeTask.executionPackage?.content || '暂无执行方案。'}</pre>
-                  </div>
-                  <div className="action-row split">
-                    <button type="button" className="secondary-button" onClick={copyExecutionPackage}>
-                      复制任务包
-                    </button>
-                    <button type="button" className="secondary-button" onClick={downloadExecutionPackage}>
-                      下载 TXT
-                    </button>
-                    <button type="button" className="secondary-button" onClick={() => openUrl(channelConfig.opencloudUrl)}>
-                      打开 OpenCloud
-                    </button>
-                    <button type="button" className="secondary-button" onClick={() => openUrl(channelConfig.codexUrl)}>
-                      打开 Codex
-                    </button>
-                  </div>
-                </section>
-
-                <section className="mini-surface">
-                  <div className="section-head compact">
-                    <div>
-                      <p className="eyebrow">回填结果</p>
-                      <h3>外部 Agent 跑完之后贴回这里</h3>
-                    </div>
-                  </div>
-                  <textarea
-                    className="prompt-box compact"
-                    value={refillDraft}
-                    onChange={(event) => setRefillDraft(event.target.value)}
-                    placeholder="把外部 Agent 的执行摘要、名单证据和下一步动作粘贴进来。"
-                  />
-                </section>
-
-                <div className="action-row split">
-                  <button type="button" className="secondary-button" onClick={sendToExternalAgent} disabled={loading}>
-                    提交到外部 Agent
-                  </button>
-                  <button type="button" className="secondary-button" onClick={markWaitingRefill} disabled={loading}>
-                    标记待回填
-                  </button>
-                  <button type="button" className="primary-button" onClick={submitRefill} disabled={loading}>
-                    回填结果
-                  </button>
+                <div className="funnel-grid compact">
+                  {Object.entries(counts).map(([label, value]) => (
+                    <article key={label} className={`funnel-card ${stageClass(label)}`}>
+                      <span>{label}</span>
+                      <strong>{value}</strong>
+                    </article>
+                  ))}
                 </div>
-              </div>
+
+                <div className="package-block">
+                  <div className="section-title compact">
+                    <p>执行方案</p>
+                    <h3>{activeTask.executionPackage?.title || '当前暂无执行方案'}</h3>
+                  </div>
+                  <pre>{activeTask.executionPackage?.content || '创建任务后，这里会生成真正可复制、可下载、可带去 OpenCloud / Codex 的执行包。'}</pre>
+                  <div className="action-bar wrap">
+                    <button type="button" className="secondary-button" onClick={copyExecutionPackage}>复制执行包</button>
+                    <button type="button" className="secondary-button" onClick={downloadExecutionPackage}>下载 txt</button>
+                    <button type="button" className="secondary-button" onClick={() => launchExternal(channelConfig.opencloudUrl, 'OpenCloud')}>打开 OpenCloud</button>
+                    <button type="button" className="secondary-button" onClick={() => launchExternal(channelConfig.codexUrl, 'Codex')}>打开 Codex</button>
+                    <button type="button" className="primary-button" onClick={sendToExternalAgent} disabled={loading}>标记为外部执行中</button>
+                    <button type="button" className="secondary-button" onClick={markWaitingRefill} disabled={loading}>标记待回填</button>
+                  </div>
+                </div>
+
+                <div className="workspace-subgrid">
+                  <section className="subsurface">
+                    <div className="section-title compact">
+                      <p>回填结果</p>
+                      <h3>外部 Agent 跑完后，把结果粘回来。</h3>
+                    </div>
+                    <textarea className="textarea medium" value={refillDraft} onChange={(event) => setRefillDraft(event.target.value)} placeholder="把 OpenCloud / Codex / 人工执行后的摘要、名单、证据与建议粘贴在这里。" />
+                    <button type="button" className="primary-button" onClick={submitRefill} disabled={loading}>回填并入库</button>
+                  </section>
+
+                  <section className="subsurface">
+                    <div className="section-title compact">
+                      <p>执行日志</p>
+                      <h3>任务真实推进记录</h3>
+                    </div>
+                    <div className="timeline-list compact">
+                      {(activeTask.logs || []).length ? activeTask.logs.map((item, index) => (
+                        <article key={`${item.at}-${index}`} className="timeline-item">
+                          <header><strong>{item.message}</strong><span>{shortDate(item.at)}</span></header>
+                          <p>{formatDateTime(item.at)}</p>
+                        </article>
+                      )) : <div className="empty-box">还没有日志。</div>}
+                    </div>
+                  </section>
+                </div>
+              </>
             ) : (
-              <div className="empty-state">先创建一个任务，这里会生成执行说明、发送动作和回填入口。</div>
+              <div className="empty-box">还没有任务。左边可以新建或切换任务。</div>
             )}
           </section>
         </div>
@@ -1024,64 +1087,74 @@ function App() {
 
   function renderAssetsPage() {
     return (
-      <div className="page-stack">
-        <section className="surface">
-          <div className="section-head">
-            <div>
-              <p className="eyebrow">品牌资产池</p>
-              <h2>{activeTaskSummary?.title || '当前任务资产'}</h2>
-            </div>
-            <input
-              className="search-input"
-              value={assetSearch}
-              onChange={(event) => setAssetSearch(event.target.value)}
-              placeholder="搜索对象、平台、状态、触达方式"
-            />
+      <div className="panel-stack">
+        <section className="workspace-card">
+          <div className="section-title">
+            <p>品牌资产池</p>
+            <h2>这不是红人名单，而是长期可复用的外联资产。</h2>
           </div>
 
-          <div className="funnel-strip">
-            {Object.entries(stageCounts).map(([label, value]) => (
-              <article key={label}>
+          <div className="toolbar-row">
+            <input className="search-input" value={assetSearch} onChange={(event) => setAssetSearch(event.target.value)} placeholder="搜索名称、平台、状态、处理方式" />
+            <div className="toolbar-spacer" />
+            <button type="button" className="secondary-button" onClick={selectAllVisibleAssets}>
+              {selectedAssetIds.length === filteredAssets.length && filteredAssets.length ? '取消全选' : '全选当前结果'}
+            </button>
+          </div>
+
+          <div className="funnel-grid">
+            {stageOptions.map((label) => (
+              <article key={label} className={`funnel-card ${stageClass(label)}`}>
                 <span>{label}</span>
-                <strong>{value}</strong>
+                <strong>{stageCounts[label] || 0}</strong>
               </article>
             ))}
           </div>
 
-          <div className="asset-table">
-            <div className="asset-table-head">
+          {selectedAssetIds.length ? (
+            <div className="bulk-strip">
+              <strong>已选 {selectedAssetIds.length} 条资产</strong>
+              <select value={bulkAction.status} onChange={(event) => setBulkAction((prev) => ({ ...prev, status: event.target.value }))}>
+                <option value="">批量修改状态</option>
+                {stageOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+              </select>
+              <select value={bulkAction.handling} onChange={(event) => setBulkAction((prev) => ({ ...prev, handling: event.target.value }))}>
+                <option value="">批量修改处理方式</option>
+                {handlingOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+              </select>
+              <input value={bulkAction.nextAction} onChange={(event) => setBulkAction((prev) => ({ ...prev, nextAction: event.target.value }))} placeholder="统一下一步动作" />
+              <input type="datetime-local" value={bulkAction.reminderAt} onChange={(event) => setBulkAction((prev) => ({ ...prev, reminderAt: event.target.value }))} />
+              <input value={bulkAction.reminderNote} onChange={(event) => setBulkAction((prev) => ({ ...prev, reminderNote: event.target.value }))} placeholder="提醒备注" />
+              <button type="button" className="primary-button" onClick={applyBulkUpdate} disabled={loading}>应用批量操作</button>
+            </div>
+          ) : null}
+
+          <div className="data-table">
+            <div className="table-head">
+              <span />
               <span>对象</span>
-              <span>类型</span>
-              <span>平台</span>
-              <span>匹配度</span>
+              <span>类型 / 平台</span>
+              <span>匹配</span>
               <span>状态</span>
               <span>处理方式</span>
+              <span>触达方式</span>
               <span>下一步</span>
             </div>
-            <div className="asset-table-body">
-              {filteredAssets.length ? (
-                filteredAssets.map((asset) => (
-                  <button
-                    key={asset.id}
-                    type="button"
-                    className={asset.id === selectedAssetId ? 'asset-row active' : 'asset-row'}
-                    onClick={() => setSelectedAssetId(asset.id)}
-                  >
-                    <span>
-                      <strong>{asset.name}</strong>
-                      <small>{asset.contact}</small>
-                    </span>
-                    <span>{asset.type}</span>
-                    <span>{asset.platform}</span>
-                    <span>{asset.fitScore}</span>
-                    <span>{asset.status}</span>
-                    <span>{asset.handling}</span>
-                    <span>{asset.nextAction}</span>
-                  </button>
-                ))
-              ) : (
-                <div className="empty-state">当前没有符合条件的资产结果。</div>
-              )}
+            <div className="table-body">
+              {filteredAssets.length ? filteredAssets.map((asset) => (
+                <button key={asset.id} type="button" className={selectedAsset?.id === asset.id ? 'table-row active' : 'table-row'} onClick={() => setSelectedAssetId(asset.id)}>
+                  <span onClick={(event) => event.stopPropagation()}>
+                    <input type="checkbox" checked={selectedAssetIds.includes(asset.id)} onChange={() => toggleAssetSelection(asset.id)} />
+                  </span>
+                  <span><strong>{asset.name}</strong><small>{asset.followers || asset.relationship || '-'}</small></span>
+                  <span><strong>{asset.type}</strong><small>{asset.platform}</small></span>
+                  <span>{asset.fitScore}</span>
+                  <span><em className={`status-chip ${stageClass(asset.status)}`}>{asset.status}</em></span>
+                  <span>{asset.handling}</span>
+                  <span>{asset.contact}</span>
+                  <span>{asset.nextAction}</span>
+                </button>
+              )) : <div className="empty-box">当前任务还没有资产结果。</div>}
             </div>
           </div>
         </section>
@@ -1091,236 +1164,138 @@ function App() {
 
   function renderConversationsPage() {
     return (
-      <div className="conversation-grid">
-        <section className="surface inbox-surface">
-          <div className="section-head">
-            <div>
-              <p className="eyebrow">会话列表</p>
-              <h2>待处理沟通</h2>
+      <div className="panel-stack">
+        <div className="conversation-layout">
+          <section className="workspace-card slim-card">
+            <div className="section-title">
+              <p>会话收件箱</p>
+              <h2>集中处理所有回复</h2>
             </div>
-          </div>
-          <input
-            className="search-input"
-            value={conversationSearch}
-            onChange={(event) => setConversationSearch(event.target.value)}
-            placeholder="搜索会话、状态、平台"
-          />
-
-          <div className="inbox-list">
-            {inboxAssets.length ? (
-              inboxAssets.map((asset) => (
-                <button
-                  key={asset.id}
-                  type="button"
-                  className={selectedConversationAsset?.id === asset.id ? 'inbox-item active' : 'inbox-item'}
-                  onClick={() => {
-                    setActiveTaskId(asset.taskId)
-                    setSelectedAssetId(asset.id)
-                  }}
-                >
-                  <div className="inbox-topline">
-                    <strong>{asset.name}</strong>
-                    <span>{asset.status}</span>
-                  </div>
-                  <small>{asset.taskTitle}</small>
+            <input className="search-input" value={conversationSearch} onChange={(event) => setConversationSearch(event.target.value)} placeholder="搜索对象、状态、任务" />
+            <div className="inbox-list">
+              {inboxAssets.length ? inboxAssets.map((asset) => (
+                <button key={asset.id} type="button" className={selectedConversationAsset?.id === asset.id ? 'inbox-item active' : 'inbox-item'} onClick={() => { setSelectedAssetId(asset.id); setActiveTaskId(asset.taskId) }}>
+                  <div><strong>{asset.name}</strong><small>{asset.taskTitle}</small></div>
+                  <em className={`status-chip ${stageClass(asset.status)}`}>{asset.status}</em>
                   <p>{asset.lastAction}</p>
                 </button>
-              ))
-            ) : (
-              <div className="empty-state">还没有会话对象。</div>
-            )}
-          </div>
-        </section>
+              )) : <div className="empty-box">暂时没有会话。</div>}
+            </div>
+          </section>
 
-        <section className="surface thread-surface">
-          <div className="section-head">
-            <div>
-              <p className="eyebrow">完整消息流</p>
+          <section className="workspace-card">
+            <div className="section-title">
+              <p>消息流</p>
               <h2>{selectedConversationAsset?.name || '选择一条会话'}</h2>
             </div>
-          </div>
 
-          <div className="thread-meta">
-            <span>{selectedConversationAsset?.platform || '-'}</span>
-            <span>{selectedConversationAsset?.handling || '-'}</span>
-            <span>{selectedConversationAsset?.status || '-'}</span>
-          </div>
-
-          <div className="message-stream">
             {selectedConversationAsset ? (
-              selectedConversationAsset.conversation.map((message, index) => (
-                <article key={`${message.role}-${index}`} className={`message-bubble ${message.role}`}>
-                  <strong>{message.role === 'agent' ? '我方' : '对方'}</strong>
-                  <p>{message.text}</p>
-                </article>
-              ))
-            ) : (
-              <div className="empty-state">选择一条会话后，这里会展示完整上下文。</div>
-            )}
-          </div>
+              <>
+                <div className="thread-meta">
+                  <span>{selectedConversationAsset.platform}</span>
+                  <span>{selectedConversationAsset.contact}</span>
+                  <span>{selectedConversationAsset.handling}</span>
+                  <span>{selectedConversationAsset.taskTitle || parseInstruction(activeTask || {}).title}</span>
+                </div>
 
-          <label className="field">
-            <span>回复草稿</span>
-            <textarea
-              className="prompt-box compact"
-              value={replyDraft}
-              onChange={(event) => setReplyDraft(event.target.value)}
-              placeholder="在这里编辑要发出的回复。"
-            />
-          </label>
+                <div className="message-stream">
+                  {(selectedConversationAsset.conversation || []).map((message, index) => (
+                    <article key={`${selectedConversationAsset.id}-${index}`} className={`message-bubble ${message.role === 'agent' ? 'mine' : 'theirs'}`}>
+                      <strong>{message.role === 'agent' ? '我方' : '对方'}</strong>
+                      <p>{message.text}</p>
+                    </article>
+                  ))}
+                </div>
 
-          <div className="action-row">
-            <button type="button" className="primary-button" onClick={sendReply} disabled={loading || !replyDraft.trim()}>
-              发送回复
-            </button>
-          </div>
-        </section>
+                <label className="field-block">
+                  <span>回复草案</span>
+                  <textarea className="textarea medium" value={replyDraft} onChange={(event) => setReplyDraft(event.target.value)} placeholder="在这里编辑要发出的回复。" />
+                </label>
+
+                <div className="action-bar wrap">
+                  <button type="button" className="primary-button" onClick={sendReply} disabled={loading || !replyDraft.trim()}>发送回复</button>
+                  <button type="button" className="secondary-button" onClick={() => openUrl(selectedConversationLinks.profileUrl)}>打开对象页面</button>
+                  <button type="button" className="secondary-button" onClick={() => openUrl(selectedConversationLinks.gmailUrl)}>Gmail</button>
+                  <button type="button" className="secondary-button" disabled={!selectedConversationLinks.whatsappUrl} onClick={() => openUrl(selectedConversationLinks.whatsappUrl)}>WhatsApp</button>
+                </div>
+              </>
+            ) : <div className="empty-box">先从左侧选择一条会话。</div>}
+          </section>
+        </div>
       </div>
     )
   }
 
   function renderBrandPage() {
     return (
-      <section className="surface">
-        <div className="section-head">
-          <div>
-            <p className="eyebrow">品牌资料底座</p>
-            <h2>这里是整个壳层调用品牌上下文的来源</h2>
-          </div>
+      <section className="workspace-card">
+        <div className="section-title">
+          <p>品牌资料底座</p>
+          <h2>这里是整套系统调用上下文的来源。</h2>
         </div>
         <div className="form-grid">
-          <label className="field">
-            <span>品牌介绍</span>
-            <textarea value={brandProfile.intro} onChange={(event) => setBrandProfile((prev) => ({ ...prev, intro: event.target.value }))} />
-          </label>
-          <label className="field">
-            <span>产品卖点 / SKU</span>
-            <textarea value={brandProfile.productPoints} onChange={(event) => setBrandProfile((prev) => ({ ...prev, productPoints: event.target.value }))} />
-          </label>
-          <label className="field">
-            <span>可接受合作方式</span>
-            <textarea value={brandProfile.cooperationModes} onChange={(event) => setBrandProfile((prev) => ({ ...prev, cooperationModes: event.target.value }))} />
-          </label>
-          <label className="field">
-            <span>过往案例 / 证明</span>
-            <textarea value={brandProfile.campaignProof} onChange={(event) => setBrandProfile((prev) => ({ ...prev, campaignProof: event.target.value }))} />
-          </label>
-          <label className="field full">
-            <span>常见问题 / FAQ</span>
-            <textarea value={brandProfile.faq} onChange={(event) => setBrandProfile((prev) => ({ ...prev, faq: event.target.value }))} />
-          </label>
+          <label className="field-block"><span>品牌介绍</span><textarea className="textarea medium" value={brandProfile.intro} onChange={(event) => setBrandProfile((prev) => ({ ...prev, intro: event.target.value }))} /></label>
+          <label className="field-block"><span>产品卖点 / SKU</span><textarea className="textarea medium" value={brandProfile.productPoints} onChange={(event) => setBrandProfile((prev) => ({ ...prev, productPoints: event.target.value }))} /></label>
+          <label className="field-block"><span>可接受合作方式</span><textarea className="textarea medium" value={brandProfile.cooperationModes} onChange={(event) => setBrandProfile((prev) => ({ ...prev, cooperationModes: event.target.value }))} /></label>
+          <label className="field-block"><span>过往案例 / 证明</span><textarea className="textarea medium" value={brandProfile.campaignProof} onChange={(event) => setBrandProfile((prev) => ({ ...prev, campaignProof: event.target.value }))} /></label>
+          <label className="field-block full"><span>常见问题 / FAQ</span><textarea className="textarea medium" value={brandProfile.faq} onChange={(event) => setBrandProfile((prev) => ({ ...prev, faq: event.target.value }))} /></label>
         </div>
-        <div className="action-row">
-          <button type="button" className="primary-button" onClick={savePreferences} disabled={loading}>
-            保存品牌资料
-          </button>
-        </div>
+        <div className="action-bar"><button type="button" className="primary-button" onClick={() => savePreferences('品牌资料')} disabled={loading}>保存品牌资料</button></div>
       </section>
     )
   }
 
   function renderChannelsPage() {
+    const youtubeUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(channelConfig.youtubeWorkspace || brandProfile.productPoints)}`
+    const instagramUrl = `https://www.instagram.com/explore/search/keyword/?q=${encodeURIComponent(channelConfig.instagramWorkspace || brandProfile.productPoints)}`
+    const tiktokUrl = `https://www.tiktok.com/search?q=${encodeURIComponent(channelConfig.tiktokWorkspace || brandProfile.productPoints)}`
+    const whatsappTestUrl = channelConfig.whatsappNumber ? `https://wa.me/${String(channelConfig.whatsappNumber).replace(/\D/g, '')}?text=${encodeURIComponent('Hello from Fangzhou AI')}` : ''
+
     return (
-      <section className="surface">
-        <div className="section-head">
-          <div>
-            <p className="eyebrow">通道状态</p>
-            <h2>当前这套壳层能抓、能发、能接什么执行端</h2>
-          </div>
+      <section className="workspace-card">
+        <div className="section-title">
+          <p>通道状态</p>
+          <h2>这里不是摆设，而是你实际启动外部动作的地方。</h2>
         </div>
-        <div className="channel-grid">
-          {channelPresets.map((channel) => (
-            <article key={channel.name} className="channel-card">
-              <div className="channel-head">
-                <strong>{channel.name}</strong>
-                <span>{channel.status}</span>
-              </div>
-              <p>{channel.ability}</p>
-              <small>{channel.note}</small>
-            </article>
-          ))}
+
+        <div className="connector-grid">
+          <article className="connector-card"><header><strong>OpenCloud</strong><em>外部 Agent</em></header><p>复制执行包后，直接打开外部 Agent 跑任务。</p><button type="button" className="secondary-button" onClick={() => openUrl(channelConfig.opencloudUrl)}>打开 OpenCloud</button></article>
+          <article className="connector-card"><header><strong>Codex / ChatGPT</strong><em>外部 Agent</em></header><p>适合文本处理、执行总结、补结构化回填。</p><button type="button" className="secondary-button" onClick={() => openUrl(channelConfig.codexUrl)}>打开 Codex</button></article>
+          <article className="connector-card"><header><strong>YouTube</strong><em>可抓取</em></header><p>按工作空间关键词直接打开搜索结果页。</p><button type="button" className="secondary-button" onClick={() => openUrl(youtubeUrl)}>打开 YouTube 工作空间</button></article>
+          <article className="connector-card"><header><strong>Instagram</strong><em>可抓取 / 可私信</em></header><p>按工作空间关键词打开探索搜索。</p><button type="button" className="secondary-button" onClick={() => openUrl(instagramUrl)}>打开 Instagram 工作空间</button></article>
+          <article className="connector-card"><header><strong>TikTok</strong><em>可抓取</em></header><p>直接用关键词进入 TikTok 搜索结果。</p><button type="button" className="secondary-button" onClick={() => openUrl(tiktokUrl)}>打开 TikTok 工作空间</button></article>
+          <article className="connector-card"><header><strong>WhatsApp</strong><em>可发起会话</em></header><p>配置测试号码后，可以直接拉起 WhatsApp 会话。</p><button type="button" className="secondary-button" disabled={!whatsappTestUrl} onClick={() => openUrl(whatsappTestUrl)}>测试 WhatsApp</button></article>
         </div>
+
         <div className="form-grid">
-          <label className="field">
-            <span>OpenCloud 地址</span>
-            <input value={channelConfig.opencloudUrl} onChange={(event) => setChannelConfig((prev) => ({ ...prev, opencloudUrl: event.target.value }))} />
-          </label>
-          <label className="field">
-            <span>Codex / ChatGPT 地址</span>
-            <input value={channelConfig.codexUrl} onChange={(event) => setChannelConfig((prev) => ({ ...prev, codexUrl: event.target.value }))} />
-          </label>
-          <label className="field">
-            <span>Gmail 发送邮箱</span>
-            <input value={channelConfig.gmailSender} onChange={(event) => setChannelConfig((prev) => ({ ...prev, gmailSender: event.target.value }))} />
-          </label>
-          <label className="field">
-            <span>WhatsApp 测试号码</span>
-            <input value={channelConfig.whatsappNumber} onChange={(event) => setChannelConfig((prev) => ({ ...prev, whatsappNumber: event.target.value }))} placeholder="例如 15551234567" />
-          </label>
-          <label className="field">
-            <span>YouTube 工作空间关键词</span>
-            <input value={channelConfig.youtubeWorkspace} onChange={(event) => setChannelConfig((prev) => ({ ...prev, youtubeWorkspace: event.target.value }))} />
-          </label>
-          <label className="field">
-            <span>Instagram 工作空间关键词</span>
-            <input value={channelConfig.instagramWorkspace} onChange={(event) => setChannelConfig((prev) => ({ ...prev, instagramWorkspace: event.target.value }))} />
-          </label>
-          <label className="field full">
-            <span>Gmail 默认签名</span>
-            <textarea value={channelConfig.gmailSignature} onChange={(event) => setChannelConfig((prev) => ({ ...prev, gmailSignature: event.target.value }))} />
-          </label>
+          <label className="field-block"><span>OpenCloud 地址</span><input value={channelConfig.opencloudUrl} onChange={(event) => setChannelConfig((prev) => ({ ...prev, opencloudUrl: event.target.value }))} /></label>
+          <label className="field-block"><span>Codex / ChatGPT 地址</span><input value={channelConfig.codexUrl} onChange={(event) => setChannelConfig((prev) => ({ ...prev, codexUrl: event.target.value }))} /></label>
+          <label className="field-block"><span>Gmail 发件邮箱</span><input value={channelConfig.gmailSender} onChange={(event) => setChannelConfig((prev) => ({ ...prev, gmailSender: event.target.value }))} /></label>
+          <label className="field-block"><span>WhatsApp 测试号码</span><input value={channelConfig.whatsappNumber} onChange={(event) => setChannelConfig((prev) => ({ ...prev, whatsappNumber: event.target.value }))} placeholder="例如 15551234567" /></label>
+          <label className="field-block"><span>YouTube 工作空间关键词</span><input value={channelConfig.youtubeWorkspace} onChange={(event) => setChannelConfig((prev) => ({ ...prev, youtubeWorkspace: event.target.value }))} /></label>
+          <label className="field-block"><span>Instagram 工作空间关键词</span><input value={channelConfig.instagramWorkspace} onChange={(event) => setChannelConfig((prev) => ({ ...prev, instagramWorkspace: event.target.value }))} /></label>
+          <label className="field-block"><span>TikTok 工作空间关键词</span><input value={channelConfig.tiktokWorkspace} onChange={(event) => setChannelConfig((prev) => ({ ...prev, tiktokWorkspace: event.target.value }))} /></label>
+          <label className="field-block full"><span>Gmail 默认签名</span><textarea className="textarea medium" value={channelConfig.gmailSignature} onChange={(event) => setChannelConfig((prev) => ({ ...prev, gmailSignature: event.target.value }))} /></label>
         </div>
-        <div className="action-row split">
-          <button type="button" className="primary-button" onClick={savePreferences} disabled={loading}>
-            保存通道配置
-          </button>
-          <button type="button" className="secondary-button" onClick={() => openUrl(channelConfig.opencloudUrl)}>
-            测试 OpenCloud
-          </button>
-          <button type="button" className="secondary-button" onClick={() => openUrl(channelConfig.codexUrl)}>
-            测试 Codex
-          </button>
-          <button
-            type="button"
-            className="secondary-button"
-            disabled={!channelConfig.whatsappNumber}
-            onClick={() => openUrl(`https://wa.me/${String(channelConfig.whatsappNumber).replace(/\D/g, '')}?text=${encodeURIComponent('Hello from Fangzhou AI')}`)}
-          >
-            测试 WhatsApp
-          </button>
-        </div>
+
+        <div className="action-bar"><button type="button" className="primary-button" onClick={() => savePreferences('通道配置')} disabled={loading}>保存通道配置</button></div>
       </section>
     )
   }
 
   function renderSettingsPage() {
     return (
-      <section className="surface">
-        <div className="section-head">
-          <div>
-            <p className="eyebrow">系统设置</p>
-            <h2>定义默认语气、跟进规则和总结规则</h2>
-          </div>
+      <section className="workspace-card">
+        <div className="section-title">
+          <p>系统设置</p>
+          <h2>定义默认语气、跟进规则和总结规则。</h2>
         </div>
         <div className="form-grid">
-          <label className="field">
-            <span>默认英文风格</span>
-            <input value={settingsState.englishTone} onChange={(event) => setSettingsState((prev) => ({ ...prev, englishTone: event.target.value }))} />
-          </label>
-          <label className="field">
-            <span>自动跟进规则</span>
-            <input value={settingsState.followupRule} onChange={(event) => setSettingsState((prev) => ({ ...prev, followupRule: event.target.value }))} />
-          </label>
-          <label className="field full">
-            <span>回填总结规则</span>
-            <textarea value={settingsState.summaryRule} onChange={(event) => setSettingsState((prev) => ({ ...prev, summaryRule: event.target.value }))} />
-          </label>
+          <label className="field-block"><span>默认英文风格</span><input value={settingsState.englishTone} onChange={(event) => setSettingsState((prev) => ({ ...prev, englishTone: event.target.value }))} /></label>
+          <label className="field-block"><span>自动跟进规则</span><input value={settingsState.followupRule} onChange={(event) => setSettingsState((prev) => ({ ...prev, followupRule: event.target.value }))} /></label>
+          <label className="field-block full"><span>回填总结规则</span><textarea className="textarea medium" value={settingsState.summaryRule} onChange={(event) => setSettingsState((prev) => ({ ...prev, summaryRule: event.target.value }))} /></label>
         </div>
-        <div className="action-row">
-          <button type="button" className="primary-button" onClick={savePreferences} disabled={loading}>
-            保存系统设置
-          </button>
-        </div>
+        <div className="action-bar"><button type="button" className="primary-button" onClick={() => savePreferences('系统设置')} disabled={loading}>保存系统设置</button></div>
       </section>
     )
   }
@@ -1338,30 +1313,29 @@ function App() {
   function renderRightRail() {
     if (pageId === 'tasks') {
       return (
-        <div className="right-stack">
-          <section className="surface compact-surface">
-            <p className="eyebrow">当前任务摘要</p>
+        <div className="rail-stack">
+          <section className="rail-card">
+            <p className="rail-kicker">任务说明</p>
             {activeTaskSummary ? (
               <>
                 <h3>{activeTaskSummary.title}</h3>
-                <div className="detail-list">
-                  <article><span>产品</span><strong>{activeTaskSummary.product}</strong></article>
-                  <article><span>市场</span><strong>{activeTaskSummary.market}</strong></article>
-                  <article><span>平台</span><strong>{activeTaskSummary.platforms}</strong></article>
-                  <article><span>约束</span><strong>{activeTaskSummary.constraints}</strong></article>
-                </div>
+                <dl className="meta-list">
+                  <div><dt>产品</dt><dd>{activeTaskSummary.product}</dd></div>
+                  <div><dt>市场</dt><dd>{activeTaskSummary.market}</dd></div>
+                  <div><dt>平台</dt><dd>{activeTaskSummary.platforms}</dd></div>
+                  <div><dt>触达方式</dt><dd>{activeTaskSummary.outreach}</dd></div>
+                  <div><dt>合作约束</dt><dd>{activeTaskSummary.constraints}</dd></div>
+                  <div><dt>目标</dt><dd>{activeTaskSummary.target}</dd></div>
+                </dl>
               </>
-            ) : (
-              <p className="empty-note">还没有任务。</p>
-            )}
+            ) : <p className="empty-note">先创建一个任务。</p>}
           </section>
-
-          <section className="surface compact-surface">
-            <p className="eyebrow">壳层下一步</p>
-            <div className="todo-list">
-              <p>1. 创建任务并生成执行说明。</p>
-              <p>2. 发送给外部 Agent 跑搜集 / 筛选 / 结构化整理。</p>
-              <p>3. 把结果回填回来，沉淀到资产和会话里。</p>
+          <section className="rail-card">
+            <p className="rail-kicker">AI 建议</p>
+            <div className="note-list">
+              <p>1. 先把执行包复制出去，再打开外部 Agent。</p>
+              <p>2. 跑完后不要只留在聊天窗口里，必须回填回来。</p>
+              <p>3. 回填完成后，再去资产页和会话页继续推进。</p>
             </div>
           </section>
         </div>
@@ -1369,137 +1343,73 @@ function App() {
     }
 
     if (pageId === 'assets') {
-      const links = buildAssetLinks(selectedAsset, brandProfile, channelConfig)
       return (
-        <div className="right-stack">
-          <section className="surface compact-surface">
-            <p className="eyebrow">资产详情</p>
+        <div className="rail-stack">
+          <section className="rail-card">
+            <p className="rail-kicker">当前资产</p>
             {selectedAsset ? (
               <>
                 <h3>{selectedAsset.name}</h3>
-                <div className="detail-list">
-                  <article><span>对象类型</span><strong>{selectedAsset.type}</strong></article>
-                  <article><span>当前阶段</span><strong>{selectedAsset.status}</strong></article>
-                  <article><span>处理方式</span><strong>{selectedAsset.handling}</strong></article>
-                  <article><span>关系温度</span><strong>{selectedAsset.relationship}</strong></article>
+                <dl className="meta-list">
+                  <div><dt>对象类型</dt><dd>{selectedAsset.type}</dd></div>
+                  <div><dt>平台</dt><dd>{selectedAsset.platform}</dd></div>
+                  <div><dt>状态</dt><dd>{selectedAsset.status}</dd></div>
+                  <div><dt>处理方式</dt><dd>{selectedAsset.handling}</dd></div>
+                  <div><dt>触达方式</dt><dd>{selectedAsset.contact}</dd></div>
+                </dl>
+                <div className="editor-block">
+                  <label className="field-block tight"><span>状态</span><select value={assetEditor.status} onChange={(event) => setAssetEditor((prev) => ({ ...prev, status: event.target.value }))}>{stageOptions.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
+                  <label className="field-block tight"><span>处理方式</span><select value={assetEditor.handling} onChange={(event) => setAssetEditor((prev) => ({ ...prev, handling: event.target.value }))}>{handlingOptions.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
+                  <label className="field-block tight"><span>下一步动作</span><textarea className="textarea small" value={assetEditor.nextAction} onChange={(event) => setAssetEditor((prev) => ({ ...prev, nextAction: event.target.value }))} /></label>
+                  <label className="field-block tight"><span>提醒时间</span><input type="datetime-local" value={assetEditor.reminderAt} onChange={(event) => setAssetEditor((prev) => ({ ...prev, reminderAt: event.target.value }))} /></label>
+                  <label className="field-block tight"><span>提醒备注</span><input value={assetEditor.reminderNote} onChange={(event) => setAssetEditor((prev) => ({ ...prev, reminderNote: event.target.value }))} /></label>
+                  <button type="button" className="primary-button full-width" onClick={saveSelectedAsset} disabled={loading}>保存资产动作</button>
                 </div>
-                <div className="surface-note">
-                  <strong>推荐动作</strong>
-                  <p>{selectedAsset.nextAction}</p>
-                </div>
-                <div className="action-row split">
-                  <button type="button" className="secondary-button" onClick={() => openUrl(links.profileUrl)}>
-                    打开对象页面
-                  </button>
-                  <button type="button" className="secondary-button" onClick={() => openUrl(links.gmailUrl)}>
-                    Gmail 触达
-                  </button>
-                  <button type="button" className="secondary-button" disabled={!links.whatsappUrl} onClick={() => openUrl(links.whatsappUrl)}>
-                    WhatsApp 触达
-                  </button>
+                <div className="action-column">
+                  <button type="button" className="secondary-button" onClick={() => openUrl(selectedLinks.profileUrl)}>打开对象页面</button>
+                  <button type="button" className="secondary-button" onClick={() => openUrl(selectedLinks.gmailUrl)}>Gmail 触达</button>
+                  <button type="button" className="secondary-button" disabled={!selectedLinks.whatsappUrl} onClick={() => openUrl(selectedLinks.whatsappUrl)}>WhatsApp 触达</button>
                 </div>
               </>
-            ) : (
-              <p className="empty-note">选择一条资产后，这里会显示关系与建议。</p>
-            )}
+            ) : <p className="empty-note">选择一条资产后，这里会显示真实动作。</p>}
           </section>
         </div>
       )
     }
 
     if (pageId === 'conversations') {
-      const links = buildAssetLinks(selectedConversationAsset, brandProfile, channelConfig)
       return (
-        <div className="right-stack">
-          <section className="surface compact-surface">
-            <p className="eyebrow">AI 副驾驶</p>
+        <div className="rail-stack">
+          <section className="rail-card">
+            <p className="rail-kicker">AI 副驾驶</p>
             {selectedConversationAsset ? (
               <>
                 <h3>{selectedConversationAsset.name}</h3>
-                <div className="detail-list">
-                  <article><span>当前判断</span><strong>{selectedConversationAsset.status}</strong></article>
-                  <article><span>处理建议</span><strong>{selectedConversationAsset.handling}</strong></article>
-                </div>
+                <dl className="meta-list">
+                  <div><dt>当前状态</dt><dd>{selectedConversationAsset.status}</dd></div>
+                  <div><dt>处理方式</dt><dd>{selectedConversationAsset.handling}</dd></div>
+                  <div><dt>最近动作</dt><dd>{selectedConversationAsset.lastAction}</dd></div>
+                </dl>
               </>
-            ) : (
-              <p className="empty-note">选择一条会话后，这里会给出回复建议。</p>
-            )}
+            ) : <p className="empty-note">先选择会话。</p>}
           </section>
-
           {selectedSuggestions.map((item) => (
-            <section key={item.title} className="surface compact-surface suggestion-block">
+            <section key={item.title} className="rail-card suggestion-card">
               <strong>{item.title}</strong>
               <p>{item.body}</p>
-              <button type="button" className="soft-chip align-left" onClick={() => setReplyDraft(item.body)}>
-                放入回复框
-              </button>
+              <button type="button" className="chip-button align-start" onClick={() => setReplyDraft(item.body)}>放入回复框</button>
             </section>
           ))}
-          {selectedConversationAsset ? (
-            <section className="surface compact-surface suggestion-block">
-              <strong>真实动作</strong>
-              <div className="action-row split">
-                <button type="button" className="secondary-button" onClick={() => openUrl(links.profileUrl)}>
-                  打开对象页
-                </button>
-                <button type="button" className="secondary-button" onClick={() => openUrl(links.gmailUrl)}>
-                  Gmail
-                </button>
-                <button type="button" className="secondary-button" disabled={!links.whatsappUrl} onClick={() => openUrl(links.whatsappUrl)}>
-                  WhatsApp
-                </button>
-              </div>
-            </section>
-          ) : null}
-        </div>
-      )
-    }
-
-    if (pageId === 'brand') {
-      return (
-        <div className="right-stack">
-          <section className="surface compact-surface">
-            <p className="eyebrow">为什么品牌资料重要</p>
-            <p className="empty-note">
-              这页不是摆设。外部 Agent 回答品牌背景、卖点、合作边界、过往案例时，都应该从这里抽信息。
-            </p>
-          </section>
-        </div>
-      )
-    }
-
-    if (pageId === 'channels') {
-      return (
-        <div className="right-stack">
-          <section className="surface compact-surface">
-            <p className="eyebrow">通道说明</p>
-            <p className="empty-note">
-              这一层只负责告诉系统：哪些地方能抓，哪些地方能发，哪些外部 Agent 能接任务。
-            </p>
-          </section>
-        </div>
-      )
-    }
-
-    if (pageId === 'settings') {
-      return (
-        <div className="right-stack">
-          <section className="surface compact-surface">
-            <p className="eyebrow">设置作用</p>
-            <p className="empty-note">
-              这里定义系统默认语气、自动跟进节奏和总结方式，让壳层在不同任务里保持一致。
-            </p>
-          </section>
         </div>
       )
     }
 
     return (
-      <div className="right-stack">
-        <section className="surface compact-surface">
-          <p className="eyebrow">当前品牌</p>
+      <div className="rail-stack">
+        <section className="rail-card">
+          <p className="rail-kicker">当前品牌</p>
           <h3>{currentBrand?.name || '未选择品牌'}</h3>
-          <p className="empty-note">{currentBrand?.overview || '这里会显示当前品牌的工作语境。'}</p>
+          <p className="empty-note">{currentBrand?.overview || '这里显示当前品牌的工作语境。'}</p>
         </section>
       </div>
     )
@@ -1508,203 +1418,108 @@ function App() {
   if (!token) {
     return (
       <div className="login-shell">
-        <section className="login-hero">
-          <p className="eyebrow">Outreach Shell for External Agents</p>
+        {error ? <div className="error-banner floating">{error}</div> : null}
+        <section className="login-panel intro-panel">
+          <p className="hero-kicker">Outreach Shell for External Agents</p>
           <h1>方洲AI</h1>
-          <p className="login-copy">
-            把 OpenCloud、Codex、人工执行都包进同一套跨境外联流程里。
-            统一任务、统一记忆、统一回填、统一资产沉淀。
-          </p>
-          <div className="login-points">
-            <article><strong>任务中枢</strong><span>自然语言创建任务，系统自动生成执行说明</span></article>
-            <article><strong>云端记忆</strong><span>所有会话、约束、资料和结果都留在云端</span></article>
-            <article><strong>外部执行</strong><span>外部 Agent 跑执行，你的系统只负责编排与沉淀</span></article>
+          <p className="login-copy">这不是一个单独的 BD 工具，也不是要替代外部 Agent。它是一层跨境外联业务壳层，把任务、会话、回填和资产沉淀统一放在云端。</p>
+          <div className="intro-grid">
+            <article><strong>统一任务中枢</strong><p>自然语言创建任务，自动生成执行方案，随时可送去 OpenCloud / Codex。</p></article>
+            <article><strong>统一会话与资产</strong><p>达人、媒体、Deal 站、联盟客不会散在不同工具里，都会回到同一系统。</p></article>
+            <article><strong>统一回填闭环</strong><p>外部执行后，不是贴在聊天里就结束，而是自动变成摘要、提醒与下一步动作。</p></article>
           </div>
         </section>
 
-        <section className="login-card">
-          <div className="auth-tabs">
-            <button type="button" className={authTab === 'login' ? 'soft-chip active' : 'soft-chip'} onClick={() => setAuthTab('login')}>
-              登录
-            </button>
-            <button type="button" className={authTab === 'register' ? 'soft-chip active' : 'soft-chip'} onClick={() => setAuthTab('register')}>
-              注册
-            </button>
+        <section className="login-panel auth-panel">
+          <div className="auth-switch">
+            <button type="button" className={authTab === 'login' ? 'chip-button active' : 'chip-button'} onClick={() => setAuthTab('login')}>登录</button>
+            <button type="button" className={authTab === 'register' ? 'chip-button active' : 'chip-button'} onClick={() => setAuthTab('register')}>注册</button>
           </div>
-
-          {error ? <div className="error-banner">{error}</div> : null}
-
           {authTab === 'login' ? (
             <div className="form-grid single">
-              <label className="field">
-                <span>邮箱</span>
-                <input value={loginForm.username} onChange={(event) => setLoginForm((prev) => ({ ...prev, username: event.target.value }))} />
-              </label>
-              <label className="field">
-                <span>密码</span>
-                <input type="password" value={loginForm.password} onChange={(event) => setLoginForm((prev) => ({ ...prev, password: event.target.value }))} />
-              </label>
-              <button type="button" className="primary-button" onClick={handleLogin} disabled={loading}>
-                {loading ? '登录中...' : '进入系统'}
-              </button>
+              <label className="field-block"><span>邮箱</span><input value={loginForm.username} onChange={(event) => setLoginForm((prev) => ({ ...prev, username: event.target.value }))} /></label>
+              <label className="field-block"><span>密码</span><input type="password" value={loginForm.password} onChange={(event) => setLoginForm((prev) => ({ ...prev, password: event.target.value }))} /></label>
+              <button type="button" className="primary-button full-width" onClick={handleLogin} disabled={loading}>{loading ? '登录中...' : '进入系统'}</button>
             </div>
           ) : (
             <div className="form-grid single">
-              <label className="field">
-                <span>姓名</span>
-                <input value={registerForm.name} onChange={(event) => setRegisterForm((prev) => ({ ...prev, name: event.target.value }))} />
-              </label>
-              <label className="field">
-                <span>邮箱</span>
-                <input value={registerForm.email} onChange={(event) => setRegisterForm((prev) => ({ ...prev, email: event.target.value }))} />
-              </label>
-              <label className="field">
-                <span>密码</span>
-                <input type="password" value={registerForm.password} onChange={(event) => setRegisterForm((prev) => ({ ...prev, password: event.target.value }))} />
-              </label>
-              <button type="button" className="primary-button" onClick={handleRegister} disabled={loading}>
-                {loading ? '注册中...' : '注册并进入'}
-              </button>
+              <label className="field-block"><span>姓名</span><input value={registerForm.name} onChange={(event) => setRegisterForm((prev) => ({ ...prev, name: event.target.value }))} /></label>
+              <label className="field-block"><span>邮箱</span><input value={registerForm.email} onChange={(event) => setRegisterForm((prev) => ({ ...prev, email: event.target.value }))} /></label>
+              <label className="field-block"><span>密码</span><input type="password" value={registerForm.password} onChange={(event) => setRegisterForm((prev) => ({ ...prev, password: event.target.value }))} /></label>
+              <button type="button" className="primary-button full-width" onClick={handleRegister} disabled={loading}>{loading ? '注册中...' : '注册并进入'}</button>
             </div>
           )}
-
-          <div className="login-footnote">
-            <span>当前存储：{bootstrap.storageMode}</span>
-            <span>当前账号模式：{bootstrap.authMode}</span>
-          </div>
+          <div className="auth-footnote"><span>存储：{bootstrap.storageMode}</span><span>账号：{bootstrap.authMode}</span></div>
         </section>
       </div>
     )
   }
 
   return (
-    <div className="shell-app">
+    <div className={sidebarCollapsed ? 'shell-app collapsed' : 'shell-app'}>
       {error ? <div className="error-banner floating">{error}</div> : null}
+      {notice ? <div className="notice-banner floating">{notice}</div> : null}
 
       <aside className="sidebar">
-        <div className="sidebar-top">
-          <div className="brand-mark">方</div>
-          <div>
-            <p className="eyebrow">Fangzhou AI</p>
-            <strong>外联业务壳层</strong>
-          </div>
+        <div className="sidebar-header">
+          <button type="button" className="logo-badge" onClick={() => setSidebarCollapsed((prev) => !prev)}>洲</button>
+          {!sidebarCollapsed ? <div className="brand-block"><p>方洲AI</p><strong>外联与资产系统</strong></div> : null}
         </div>
-
-        <label className="workspace-switch">
-          <span>品牌空间</span>
-          <select value={brandId} onChange={(event) => setBrandId(event.target.value)}>
-            {bootstrap.brands.map((brand) => (
-              <option key={brand.id} value={brand.id}>
-                {brand.name}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <button type="button" className="primary-button sidebar-button" onClick={() => setPageId('tasks')}>
-          + 新建任务
-        </button>
-
-        <input
-          className="search-input"
-          value={taskSearch}
-          onChange={(event) => setTaskSearch(event.target.value)}
-          placeholder="搜索任务 / SKU / 市场"
-        />
-
+        {!sidebarCollapsed ? (
+          <>
+            <label className="field-block tight"><span>品牌空间</span><select value={brandId} onChange={(event) => setBrandId(event.target.value)}>{bootstrap.brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}</select></label>
+            <button type="button" className="primary-button full-width" onClick={() => setPageId('tasks')}>+ 新建任务</button>
+            <input className="search-input" value={taskSearch} onChange={(event) => setTaskSearch(event.target.value)} placeholder="搜索任务 / SKU / 市场" />
+          </>
+        ) : null}
         <nav className="sidebar-nav">
           {navItems.map((item) => (
-            <button key={item.id} type="button" className={pageId === item.id ? 'nav-button active' : 'nav-button'} onClick={() => setPageId(item.id)}>
-              {item.label}
-            </button>
+            <button key={item.id} type="button" className={pageId === item.id ? 'nav-link active' : 'nav-link'} onClick={() => setPageId(item.id)} title={item.label}><span>{item.label}</span></button>
           ))}
         </nav>
-
-        <section className="sidebar-section">
-          <div className="section-head compact">
-            <div>
-              <p className="eyebrow">最近任务</p>
-            </div>
-          </div>
-          <div className="sidebar-scroll">
-            {visibleTasks.length ? (
-              visibleTasks.map((task) => {
-                const summary = parseInstruction(task)
-                return (
-                  <button
-                    key={task.id}
-                    type="button"
-                    className={activeTask?.id === task.id ? 'task-link active' : 'task-link'}
-                    onClick={() => {
-                      setActiveTaskId(task.id)
-                      setPageId('tasks')
-                    }}
-                  >
-                    <strong>{summary.title}</strong>
-                    <small>{`${summary.market} · ${summary.product}`}</small>
-                    <span>{normalizeTaskStatus(task.status)}</span>
+        {!sidebarCollapsed ? (
+          <>
+            <section className="sidebar-section">
+              <div className="sidebar-section-head"><p>最近任务</p></div>
+              <div className="sidebar-scroll">
+                {visibleTasks.length ? visibleTasks.map((task) => {
+                  const summary = parseInstruction(task)
+                  return <button key={task.id} type="button" className={activeTask?.id === task.id ? 'sidebar-item active' : 'sidebar-item'} onClick={() => { setActiveTaskId(task.id); setPageId('tasks') }}><strong>{summary.title}</strong><small>{summary.market} / {summary.product}</small><em>{normalizeTaskStatus(task.status)}</em></button>
+                }) : <div className="sidebar-empty">还没有任务。</div>}
+              </div>
+            </section>
+            <section className="sidebar-section">
+              <div className="sidebar-section-head"><p>最近会话</p></div>
+              <div className="sidebar-scroll compact-scroll">
+                {allConversationAssets.slice(0, 5).map((asset) => (
+                  <button key={asset.id} type="button" className="sidebar-item slim" onClick={() => { setPageId('conversations'); setActiveTaskId(asset.taskId); setSelectedAssetId(asset.id) }}>
+                    <strong>{asset.name}</strong>
+                    <small>{asset.lastAction}</small>
                   </button>
-                )
-              })
-            ) : (
-              <div className="empty-note">还没有任务。</div>
-            )}
-          </div>
-        </section>
-
-        <section className="sidebar-section">
-          <div className="section-head compact">
-            <div>
-              <p className="eyebrow">最近会话</p>
-            </div>
-          </div>
-          <div className="sidebar-scroll slim">
-            {allConversationAssets.slice(0, 5).map((asset) => (
-              <button
-                key={asset.id}
-                type="button"
-                className="task-link slim"
-                onClick={() => {
-                  setPageId('conversations')
-                  setActiveTaskId(asset.taskId)
-                  setSelectedAssetId(asset.id)
-                }}
-              >
-                <strong>{asset.name}</strong>
-                <small>{asset.lastAction}</small>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <div className="sidebar-bottom">
-          <div className="user-card">
-            <strong>{currentUser?.name || '当前用户'}</strong>
-            <small>{currentUser?.username || '-'}</small>
-          </div>
-          <button type="button" className="soft-chip align-left" onClick={handleLogout}>
-            退出
-          </button>
+                ))}
+              </div>
+            </section>
+          </>
+        ) : null}
+        <div className="sidebar-footer">
+          {!sidebarCollapsed ? (
+            <>
+              <div className="user-panel"><strong>{currentUser?.name || '当前用户'}</strong><small>{currentUser?.username || '-'}</small></div>
+              <button type="button" className="chip-button align-start" onClick={handleLogout}>退出</button>
+            </>
+          ) : <button type="button" className="chip-button icon-only" onClick={handleLogout} title="退出">退</button>}
         </div>
       </aside>
 
-      <main className="main-panel">
-        <header className="context-bar">
-          <div className="context-left">
-            <strong>{currentBrand?.name || '未选择品牌'}</strong>
-            <span>{currentBrand?.overview || '这里显示当前品牌的工作语境。'}</span>
-          </div>
-          <div className="context-tags">
-            <span>{bootstrap.storageMode}</span>
-            <span>{bootstrap.authMode}</span>
-            <span>{currentUser?.authMode || 'session'}</span>
-          </div>
+      <main className="workspace">
+        <header className="context-strip">
+          <div><strong>{currentBrand?.name || '未选择品牌'}</strong><p>{currentBrand?.overview || '这里显示当前品牌的工作语境。'}</p></div>
+          <div className="context-tags"><span>{bootstrap.storageMode}</span><span>{bootstrap.authMode}</span><span>{currentUser?.authMode || 'session'}</span></div>
         </header>
-
-        <section className="content-area">{renderCenterContent()}</section>
+        <section className="workspace-body">{renderCenterContent()}</section>
       </main>
 
-      <aside className="assistant-rail">{renderRightRail()}</aside>
+      <aside className="right-rail">{renderRightRail()}</aside>
     </div>
   )
 }
