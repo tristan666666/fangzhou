@@ -66,6 +66,17 @@ const brandProfileSeed = {
   faq: '是否支持寄样、佣金边界、物流周期、品牌卖点、竞品差异。',
 }
 
+const channelConfigSeed = {
+  opencloudUrl: 'https://app.opencloud.com',
+  codexUrl: 'https://chatgpt.com',
+  gmailSender: '',
+  gmailSignature: 'Best regards,\nFangzhou AI',
+  whatsappNumber: '',
+  youtubeWorkspace: '',
+  instagramWorkspace: '',
+  tiktokWorkspace: '',
+}
+
 const settingsSeed = {
   englishTone: '自然专业',
   followupRule: '48 小时后自动提醒复查，复杂对话进入人工接管',
@@ -173,6 +184,9 @@ function buildMockAssets(task) {
       name: 'Mia Moves',
       type: '达人',
       platform: 'TikTok',
+      profileUrl: 'https://www.tiktok.com',
+      email: 'mia@example.com',
+      phone: '15551234567',
       fitScore: 92,
       contact: 'Instagram DM',
       status: '待回复',
@@ -193,6 +207,8 @@ function buildMockAssets(task) {
       name: 'Wellness Weekly',
       type: '媒体 / PR',
       platform: 'Editorial',
+      profileUrl: 'https://www.google.com/search?q=wellness+weekly',
+      email: 'editor@wellnessweekly.com',
       fitScore: 84,
       contact: 'Gmail',
       status: '待接管',
@@ -212,6 +228,8 @@ function buildMockAssets(task) {
       name: 'Gym Deal Hunter',
       type: 'Deal 站',
       platform: 'Deal Site',
+      profileUrl: 'https://www.google.com/search?q=gym+deal+hunter',
+      email: 'ops@gymdealhunter.com',
       fitScore: 79,
       contact: 'Gmail',
       status: '已触达',
@@ -231,6 +249,8 @@ function buildMockAssets(task) {
       name: 'PowerCore Jay',
       type: 'YouTube 测评',
       platform: 'YouTube',
+      profileUrl: 'https://www.youtube.com/results?search_query=powercore+jay',
+      email: 'jay@powercore.studio',
       fitScore: 88,
       contact: 'Gmail',
       status: '已合作',
@@ -288,6 +308,54 @@ function assetStageCounts(assets) {
   return counts
 }
 
+function buildEmailDraft(asset, brandProfile, channelConfig) {
+  return [
+    `Hi ${asset?.name || 'there'},`,
+    '',
+    `I am reaching out about a potential collaboration related to ${brandProfile.productPoints}.`,
+    `We usually work on ${brandProfile.cooperationModes}.`,
+    '',
+    brandProfile.intro,
+    '',
+    channelConfig.gmailSignature || '',
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
+function buildAssetLinks(asset, brandProfile, channelConfig) {
+  const summary = encodeURIComponent(buildEmailDraft(asset, brandProfile, channelConfig))
+  const subject = encodeURIComponent(`${brandProfile.productPoints} 合作沟通`)
+  const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(asset?.email || '')}&su=${subject}&body=${summary}`
+  const whatsappUrl = asset?.phone ? `https://wa.me/${String(asset.phone).replace(/\D/g, '')}?text=${summary}` : ''
+  const profileUrl =
+    asset?.profileUrl
+      || (asset?.platform === 'YouTube' ? `https://www.youtube.com/results?search_query=${encodeURIComponent(asset.name)}` : '')
+      || (asset?.platform === 'TikTok' ? `https://www.tiktok.com/search?q=${encodeURIComponent(asset.name)}` : '')
+      || `https://www.google.com/search?q=${encodeURIComponent(asset?.name || '')}`
+
+  return { gmailUrl, whatsappUrl, profileUrl }
+}
+
+async function copyText(text) {
+  await navigator.clipboard.writeText(text)
+}
+
+function downloadText(filename, content) {
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
+function openUrl(url) {
+  if (!url) return
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
+
 function App() {
   const [bootstrap, setBootstrap] = useState({ brands: [], modules: [], demoCredentials: loginSeed, storageMode: 'memory', authMode: 'demo' })
   const [token, setToken] = useState(() => localStorage.getItem('fangzhou_shell_token') || '')
@@ -309,6 +377,7 @@ function App() {
   const [loginForm, setLoginForm] = useState(loginSeed)
   const [registerForm, setRegisterForm] = useState({ name: '', email: '', password: '' })
   const [brandProfile, setBrandProfile] = useState(brandProfileSeed)
+  const [channelConfig, setChannelConfig] = useState(channelConfigSeed)
   const [settingsState, setSettingsState] = useState(settingsSeed)
   const [localAssetsByTask, setLocalAssetsByTask] = useState({})
 
@@ -347,6 +416,18 @@ function App() {
       setToken('')
       setCurrentUser(null)
     })
+  }, [token, brandId])
+
+  useEffect(() => {
+    if (!token || !brandId) return
+
+    apiFetch(`/api/preferences?brandId=${brandId}`, {}, token)
+      .then((preferences) => {
+        setBrandProfile({ ...brandProfileSeed, ...(preferences.brandProfile || {}) })
+        setChannelConfig({ ...channelConfigSeed, ...(preferences.channelConfig || {}) })
+        setSettingsState({ ...settingsSeed, ...(preferences.settings || {}) })
+      })
+      .catch((loadError) => setError(loadError.message))
   }, [token, brandId])
 
   useEffect(() => {
@@ -519,6 +600,30 @@ function App() {
     setActiveTaskId(nextTaskId || dash.activeTaskId || dash.tasks?.[0]?.id || '')
   }
 
+  async function savePreferences() {
+    setLoading(true)
+    setError('')
+    try {
+      await apiFetch(
+        '/api/preferences',
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            brandId,
+            brandProfile,
+            channelConfig,
+            settings: settingsState,
+          }),
+        },
+        token,
+      )
+    } catch (saveError) {
+      setError(saveError.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function createTask() {
     if (!taskPrompt.trim()) {
       setError('请先输入任务目标。')
@@ -628,6 +733,20 @@ function App() {
     } finally {
       setLoading(false)
     }
+  }
+
+  async function copyExecutionPackage() {
+    if (!activeTask?.executionPackage?.content) return
+    try {
+      await copyText(activeTask.executionPackage.content)
+    } catch (copyError) {
+      setError(copyError.message)
+    }
+  }
+
+  function downloadExecutionPackage() {
+    if (!activeTask?.executionPackage?.content) return
+    downloadText(activeTask.executionPackage.exportName || `${activeTask.id}.txt`, activeTask.executionPackage.content)
   }
 
   function renderOverviewPage() {
@@ -829,6 +948,20 @@ function App() {
                     <strong>{activeTask.executionPackage?.title || '执行方案'}</strong>
                     <p>{activeTask.executionPackage?.externalStatus || '尚未发送到外部执行端'}</p>
                     <pre>{activeTask.executionPackage?.content || '暂无执行方案。'}</pre>
+                  </div>
+                  <div className="action-row split">
+                    <button type="button" className="secondary-button" onClick={copyExecutionPackage}>
+                      复制任务包
+                    </button>
+                    <button type="button" className="secondary-button" onClick={downloadExecutionPackage}>
+                      下载 TXT
+                    </button>
+                    <button type="button" className="secondary-button" onClick={() => openUrl(channelConfig.opencloudUrl)}>
+                      打开 OpenCloud
+                    </button>
+                    <button type="button" className="secondary-button" onClick={() => openUrl(channelConfig.codexUrl)}>
+                      打开 Codex
+                    </button>
                   </div>
                 </section>
 
@@ -1056,6 +1189,11 @@ function App() {
             <textarea value={brandProfile.faq} onChange={(event) => setBrandProfile((prev) => ({ ...prev, faq: event.target.value }))} />
           </label>
         </div>
+        <div className="action-row">
+          <button type="button" className="primary-button" onClick={savePreferences} disabled={loading}>
+            保存品牌资料
+          </button>
+        </div>
       </section>
     )
   }
@@ -1080,6 +1218,55 @@ function App() {
               <small>{channel.note}</small>
             </article>
           ))}
+        </div>
+        <div className="form-grid">
+          <label className="field">
+            <span>OpenCloud 地址</span>
+            <input value={channelConfig.opencloudUrl} onChange={(event) => setChannelConfig((prev) => ({ ...prev, opencloudUrl: event.target.value }))} />
+          </label>
+          <label className="field">
+            <span>Codex / ChatGPT 地址</span>
+            <input value={channelConfig.codexUrl} onChange={(event) => setChannelConfig((prev) => ({ ...prev, codexUrl: event.target.value }))} />
+          </label>
+          <label className="field">
+            <span>Gmail 发送邮箱</span>
+            <input value={channelConfig.gmailSender} onChange={(event) => setChannelConfig((prev) => ({ ...prev, gmailSender: event.target.value }))} />
+          </label>
+          <label className="field">
+            <span>WhatsApp 测试号码</span>
+            <input value={channelConfig.whatsappNumber} onChange={(event) => setChannelConfig((prev) => ({ ...prev, whatsappNumber: event.target.value }))} placeholder="例如 15551234567" />
+          </label>
+          <label className="field">
+            <span>YouTube 工作空间关键词</span>
+            <input value={channelConfig.youtubeWorkspace} onChange={(event) => setChannelConfig((prev) => ({ ...prev, youtubeWorkspace: event.target.value }))} />
+          </label>
+          <label className="field">
+            <span>Instagram 工作空间关键词</span>
+            <input value={channelConfig.instagramWorkspace} onChange={(event) => setChannelConfig((prev) => ({ ...prev, instagramWorkspace: event.target.value }))} />
+          </label>
+          <label className="field full">
+            <span>Gmail 默认签名</span>
+            <textarea value={channelConfig.gmailSignature} onChange={(event) => setChannelConfig((prev) => ({ ...prev, gmailSignature: event.target.value }))} />
+          </label>
+        </div>
+        <div className="action-row split">
+          <button type="button" className="primary-button" onClick={savePreferences} disabled={loading}>
+            保存通道配置
+          </button>
+          <button type="button" className="secondary-button" onClick={() => openUrl(channelConfig.opencloudUrl)}>
+            测试 OpenCloud
+          </button>
+          <button type="button" className="secondary-button" onClick={() => openUrl(channelConfig.codexUrl)}>
+            测试 Codex
+          </button>
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={!channelConfig.whatsappNumber}
+            onClick={() => openUrl(`https://wa.me/${String(channelConfig.whatsappNumber).replace(/\D/g, '')}?text=${encodeURIComponent('Hello from Fangzhou AI')}`)}
+          >
+            测试 WhatsApp
+          </button>
         </div>
       </section>
     )
@@ -1107,6 +1294,11 @@ function App() {
             <span>回填总结规则</span>
             <textarea value={settingsState.summaryRule} onChange={(event) => setSettingsState((prev) => ({ ...prev, summaryRule: event.target.value }))} />
           </label>
+        </div>
+        <div className="action-row">
+          <button type="button" className="primary-button" onClick={savePreferences} disabled={loading}>
+            保存系统设置
+          </button>
         </div>
       </section>
     )
@@ -1156,6 +1348,7 @@ function App() {
     }
 
     if (pageId === 'assets') {
+      const links = buildAssetLinks(selectedAsset, brandProfile, channelConfig)
       return (
         <div className="right-stack">
           <section className="surface compact-surface">
@@ -1173,6 +1366,17 @@ function App() {
                   <strong>推荐动作</strong>
                   <p>{selectedAsset.nextAction}</p>
                 </div>
+                <div className="action-row split">
+                  <button type="button" className="secondary-button" onClick={() => openUrl(links.profileUrl)}>
+                    打开对象页面
+                  </button>
+                  <button type="button" className="secondary-button" onClick={() => openUrl(links.gmailUrl)}>
+                    Gmail 触达
+                  </button>
+                  <button type="button" className="secondary-button" disabled={!links.whatsappUrl} onClick={() => openUrl(links.whatsappUrl)}>
+                    WhatsApp 触达
+                  </button>
+                </div>
               </>
             ) : (
               <p className="empty-note">选择一条资产后，这里会显示关系与建议。</p>
@@ -1183,6 +1387,7 @@ function App() {
     }
 
     if (pageId === 'conversations') {
+      const links = buildAssetLinks(selectedConversationAsset, brandProfile, channelConfig)
       return (
         <div className="right-stack">
           <section className="surface compact-surface">
@@ -1209,6 +1414,22 @@ function App() {
               </button>
             </section>
           ))}
+          {selectedConversationAsset ? (
+            <section className="surface compact-surface suggestion-block">
+              <strong>真实动作</strong>
+              <div className="action-row split">
+                <button type="button" className="secondary-button" onClick={() => openUrl(links.profileUrl)}>
+                  打开对象页
+                </button>
+                <button type="button" className="secondary-button" onClick={() => openUrl(links.gmailUrl)}>
+                  Gmail
+                </button>
+                <button type="button" className="secondary-button" disabled={!links.whatsappUrl} onClick={() => openUrl(links.whatsappUrl)}>
+                  WhatsApp
+                </button>
+              </div>
+            </section>
+          ) : null}
         </div>
       )
     }

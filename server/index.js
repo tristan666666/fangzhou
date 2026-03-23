@@ -91,7 +91,35 @@ const userTokens = new Map()
 const memoryTasks = []
 const memoryLeads = []
 const memoryMessages = []
+const memoryPreferences = new Map()
 let bootstrapped = false
+
+function defaultPreferences() {
+  return {
+    brandProfile: {
+      intro: '我们是一套套在外部 Agent 之上的跨境外联业务壳层，负责统一记忆、任务编排、回填和资产沉淀。',
+      productPoints: '筋膜枪 / 恢复类设备 / 居家健身',
+      cooperationModes: '寄样 + 佣金，优先长期合作，默认不接受固定坑位费',
+      campaignProof: '首轮重点验证 TikTok / Instagram / YouTube / Deal 站的外联效率和回填闭环。',
+      faq: '是否支持寄样、佣金边界、物流周期、品牌卖点、竞品差异。',
+    },
+    channelConfig: {
+      opencloudUrl: 'https://app.opencloud.com',
+      codexUrl: 'https://chatgpt.com',
+      gmailSender: '',
+      gmailSignature: 'Best regards,\nFangzhou AI',
+      whatsappNumber: '',
+      youtubeWorkspace: '',
+      instagramWorkspace: '',
+      tiktokWorkspace: '',
+    },
+    settings: {
+      englishTone: '自然专业',
+      followupRule: '48 小时后自动提醒复查，复杂对话进入人工接管',
+      summaryRule: '每次回填后自动生成摘要、下一步动作和资产更新建议',
+    },
+  }
+}
 
 function nowIso() {
   return new Date().toISOString()
@@ -326,6 +354,61 @@ async function resolveAuthUser(req) {
     name: data.user.user_metadata?.name || data.user.email || 'Supabase User',
     authMode: 'supabase',
   }
+}
+
+async function loadUserPreferences(user, brandId) {
+  const base = defaultPreferences()
+
+  if (user.authMode !== 'supabase' || !supabaseAuthEnabled) {
+    const stored = memoryPreferences.get(user.id) || {}
+    return stored[brandId] || base
+  }
+
+  const { data, error } = await supabase.auth.admin.getUserById(user.id)
+  if (error || !data.user) return base
+
+  const stored = data.user.user_metadata?.brandPreferences?.[brandId] || {}
+  return {
+    ...base,
+    ...stored,
+    brandProfile: { ...base.brandProfile, ...(stored.brandProfile || {}) },
+    channelConfig: { ...base.channelConfig, ...(stored.channelConfig || {}) },
+    settings: { ...base.settings, ...(stored.settings || {}) },
+  }
+}
+
+async function saveUserPreferences(user, brandId, nextPreferences) {
+  const merged = {
+    ...defaultPreferences(),
+    ...nextPreferences,
+    brandProfile: { ...defaultPreferences().brandProfile, ...(nextPreferences.brandProfile || {}) },
+    channelConfig: { ...defaultPreferences().channelConfig, ...(nextPreferences.channelConfig || {}) },
+    settings: { ...defaultPreferences().settings, ...(nextPreferences.settings || {}) },
+  }
+
+  if (user.authMode !== 'supabase' || !supabaseAuthEnabled) {
+    const existing = memoryPreferences.get(user.id) || {}
+    memoryPreferences.set(user.id, { ...existing, [brandId]: merged })
+    return merged
+  }
+
+  const { data, error } = await supabase.auth.admin.getUserById(user.id)
+  if (error || !data.user) throw error || new Error('USER_NOT_FOUND')
+
+  const metadata = data.user.user_metadata || {}
+  const existingBrandPreferences = metadata.brandPreferences || {}
+  const { error: updateError } = await supabase.auth.admin.updateUserById(user.id, {
+    user_metadata: {
+      ...metadata,
+      brandPreferences: {
+        ...existingBrandPreferences,
+        [brandId]: merged,
+      },
+    },
+  })
+
+  if (updateError) throw updateError
+  return merged
 }
 
 async function requireUser(req, res, next) {
@@ -1061,6 +1144,30 @@ app.get('/api/me', requireUser, async (req, res) => {
     },
     brands,
   })
+})
+
+app.get('/api/preferences', requireUser, async (req, res) => {
+  await seedDemoData()
+  const brands = await getBrands()
+  const brandId = String(req.query.brandId || brands[0]?.id || '')
+  res.json(await loadUserPreferences(req.user, brandId))
+})
+
+app.put('/api/preferences', requireUser, async (req, res) => {
+  await seedDemoData()
+  const { brandId, brandProfile, channelConfig, settings } = req.body
+  if (!brandId) {
+    res.status(400).json({ error: 'INVALID_BRAND_ID' })
+    return
+  }
+
+  const saved = await saveUserPreferences(req.user, brandId, {
+    brandProfile: brandProfile || {},
+    channelConfig: channelConfig || {},
+    settings: settings || {},
+  })
+
+  res.json(saved)
 })
 
 app.get('/api/dashboard', requireUser, async (req, res) => {
