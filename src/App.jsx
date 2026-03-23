@@ -356,6 +356,23 @@ function openUrl(url) {
   window.open(url, '_blank', 'noopener,noreferrer')
 }
 
+function localPreferenceKey(brandId) {
+  return `fangzhou_shell_preferences_${brandId}`
+}
+
+function readLocalPreferences(brandId) {
+  try {
+    const raw = localStorage.getItem(localPreferenceKey(brandId))
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+function writeLocalPreferences(brandId, payload) {
+  localStorage.setItem(localPreferenceKey(brandId), JSON.stringify(payload))
+}
+
 function App() {
   const [bootstrap, setBootstrap] = useState({ brands: [], modules: [], demoCredentials: loginSeed, storageMode: 'memory', authMode: 'demo' })
   const [token, setToken] = useState(() => localStorage.getItem('fangzhou_shell_token') || '')
@@ -427,7 +444,14 @@ function App() {
         setChannelConfig({ ...channelConfigSeed, ...(preferences.channelConfig || {}) })
         setSettingsState({ ...settingsSeed, ...(preferences.settings || {}) })
       })
-      .catch((loadError) => setError(loadError.message))
+      .catch(() => {
+        const localPreferences = readLocalPreferences(brandId)
+        if (localPreferences) {
+          setBrandProfile({ ...brandProfileSeed, ...(localPreferences.brandProfile || {}) })
+          setChannelConfig({ ...channelConfigSeed, ...(localPreferences.channelConfig || {}) })
+          setSettingsState({ ...settingsSeed, ...(localPreferences.settings || {}) })
+        }
+      })
   }, [token, brandId])
 
   useEffect(() => {
@@ -603,22 +627,19 @@ function App() {
   async function savePreferences() {
     setLoading(true)
     setError('')
+    const payload = {
+      brandId,
+      brandProfile,
+      channelConfig,
+      settings: settingsState,
+    }
+
     try {
-      await apiFetch(
-        '/api/preferences',
-        {
-          method: 'PUT',
-          body: JSON.stringify({
-            brandId,
-            brandProfile,
-            channelConfig,
-            settings: settingsState,
-          }),
-        },
-        token,
-      )
+      await apiFetch('/api/preferences', { method: 'PUT', body: JSON.stringify(payload) }, token)
+      writeLocalPreferences(brandId, payload)
     } catch (saveError) {
-      setError(saveError.message)
+      writeLocalPreferences(brandId, payload)
+      setError('当前先保存到本地浏览器，等线上后端更新后会继续走云端保存。')
     } finally {
       setLoading(false)
     }
