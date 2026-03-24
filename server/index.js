@@ -35,7 +35,7 @@ const demoBrands = [
   {
     id: 'brand-demo-2',
     name: 'North Star Beauty',
-    overview: '用于跨境外联推进的品牌空间，可管理任务、资产、会话和品牌资料。',
+    overview: '用于跨境外联推进的品牌空间，可管理任务、资产、会话和品牌记忆。',
   },
 ]
 
@@ -504,7 +504,7 @@ function createDemoLeadSet(task) {
       lastAction: '对方回复要媒体包与合作条件',
       nextAction: '补一版品牌说明与报价边界',
       intent: '有兴趣，但需要更多资料',
-      risk: '品牌资料不完整会拖慢推进',
+      risk: '品牌记忆不完整会拖慢推进',
       notes: '适合做测评合作，重点看发布时间和栏目形式。',
       reminderAt: null,
       reminderNote: '',
@@ -594,7 +594,7 @@ function createDemoLeadSet(task) {
       status: '待人工接管',
       handling: '人工接管',
       lastAction: '对方要求品牌背景、定价和 campaign 目标',
-      nextAction: '补齐品牌资料后再回',
+      nextAction: '补齐品牌记忆后再回',
       intent: '需提供更完整品牌信息',
       risk: '信息不完整会影响推进',
       notes: '对内容要求细，适合人工确认叙事和 KPI。',
@@ -822,10 +822,10 @@ async function seedDemoData() {
           task.refill = parseRefillResult(`### 执行摘要
 - 已完成一轮 spring launch 外联清单整理，覆盖测评频道、渠道站点和媒体合作对象。
 - 当前已有 4 个高优先级对象进入沟通，其中 1 个渠道站点已确认 4 月合作窗口。
-- 品牌资料已经补进任务上下文，下一轮可以继续放大到 affiliate 和 newsletter 合作。
+- 品牌记忆已经补进任务上下文，下一轮可以继续放大到 affiliate 和 newsletter 合作。
 
 ### 对象 / 证据
-- Pulse Review Lab：YouTube 测评频道，已回复并索要品牌资料。
+- Pulse Review Lab：YouTube 测评频道，已回复并索要品牌记忆资料。
 - Deal Circle Daily：渠道站点，已进入 4 月 newsletter 洽谈。
 - Recovery Notes Media：媒体合作方，要求补品牌背景和 KPI。
 
@@ -889,10 +889,10 @@ async function seedDemoData() {
       task.refill = parseRefillResult(`### 执行摘要
 - 已完成一轮 spring launch 外联清单整理，覆盖测评频道、渠道站点和媒体合作对象。
 - 当前已有 4 个高优先级对象进入沟通，其中 1 个渠道站点已确认 4 月合作窗口。
-- 品牌资料已经补进任务上下文，下一轮可以继续放大到 affiliate 和 newsletter 合作。
+- 品牌记忆已经补进任务上下文，下一轮可以继续放大到 affiliate 和 newsletter 合作。
 
 ### 对象 / 证据
-- Pulse Review Lab：YouTube 测评频道，已回复并索要品牌资料。
+- Pulse Review Lab：YouTube 测评频道，已回复并索要品牌记忆资料。
 - Deal Circle Daily：渠道站点，已进入 4 月 newsletter 洽谈。
 - Recovery Notes Media：媒体合作方，要求补品牌背景和 KPI。
 

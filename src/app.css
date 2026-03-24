@@ -280,13 +280,15 @@
   border-radius: 18px;
   background: #171717;
   color: #ececec;
+  overflow: hidden;
 }
 
 .sidebar-group {
   padding: 12px;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.055);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.065);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  overflow: hidden;
 }
 
 .brand-mark {
@@ -317,6 +319,7 @@
   overflow: auto;
   display: grid;
   gap: 10px;
+  padding-right: 4px;
 }
 
 .list-scroll.compact {
@@ -326,19 +329,27 @@
 .task-chip,
 .conversation-chip {
   border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.08);
   color: #edf3ef;
   padding: 12px;
   text-align: left;
   display: grid;
   gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.task-chip strong,
+.conversation-chip strong {
+  color: #ffffff;
+  line-height: 1.35;
 }
 
 .task-chip span,
 .conversation-chip span,
 .empty-copy {
   font-size: 13px;
-  color: rgba(237, 243, 239, 0.84);
+  color: rgba(237, 243, 239, 0.88);
 }
 
 .task-chip em {
@@ -347,7 +358,7 @@
 
 .task-chip-meta {
   font-size: 12px;
-  color: rgba(237, 243, 239, 0.72);
+  color: rgba(237, 243, 239, 0.78);
 }
 
 .task-chip-foot {
@@ -355,6 +366,12 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+}
+
+.task-chip.active,
+.conversation-chip.active {
+  background: rgba(16, 163, 127, 0.2);
+  border-color: rgba(16, 163, 127, 0.42);
 }
 
 .main-shell {
@@ -866,6 +883,19 @@
   background: rgba(255, 255, 255, 0.72);
 }
 
+.task-chip .status-pill,
+.conversation-chip .status-pill {
+  color: #0f172a;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.form-shell > .stack-panel {
+  border: 1px solid #e6e7eb;
+  border-radius: 18px;
+  padding: 18px;
+  background: #ffffff;
+}
+
 .suggestion-card {
   border: 1px solid #e6e7eb;
   background: #fafafa;
@@ -926,10 +956,23 @@
   .sidebar-shell {
     position: static;
     height: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
   }
 
   .task-side-column {
     position: static;
+  }
+
+  .list-scroll,
+  .list-scroll.compact {
+    max-height: 220px;
+  }
+
+  .message-list {
+    min-height: 320px;
+    max-height: 420px;
   }
 
   .table-head {

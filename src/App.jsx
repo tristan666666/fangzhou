@@ -16,12 +16,12 @@ const quickPrompts = [
 ]
 
 const navItems = [
-  { id: 'tasks', label: '任务' },
-  { id: 'assets', label: '资产' },
-  { id: 'conversations', label: '会话' },
-  { id: 'brand', label: '品牌资料' },
-  { id: 'channels', label: '通道' },
-  { id: 'settings', label: '设置' },
+  { id: 'tasks', label: '任务推进' },
+  { id: 'assets', label: '品牌资产' },
+  { id: 'conversations', label: '沟通记录' },
+  { id: 'brand', label: '品牌记忆' },
+  { id: 'channels', label: '执行入口' },
+  { id: 'settings', label: '工作偏好' },
 ]
 
 const funnelOrder = ['已抓取', '初筛通过', '已触达', '已回复', '洽谈中', '已确认合作', '待人工接管']
@@ -281,13 +281,13 @@ function getProviderOptions(config) {
       id: 'opencloud',
       label: config.opencloudName || 'OpenClaw Workspace',
       url: config.opencloudUrl,
-      hint: '主执行入口',
+      hint: '主工作区',
     },
     {
       id: 'codex',
       label: config.codexName || 'Codex / ChatGPT',
       url: config.codexUrl,
-      hint: '备用执行入口',
+      hint: '备用工作区',
     },
   ]
 }
@@ -346,7 +346,7 @@ function statusClass(status) {
 function buildSuggestions(lead, prefs) {
   if (!lead) return []
   const latest = lead.conversation?.at(-1)?.text || ''
-  const intro = prefs.brandProfile.intro || '品牌资料暂未补全'
+  const intro = prefs.brandProfile.intro || '品牌记忆还没有补全'
 
   if (/fee|budget|报价|价格|charge/i.test(latest)) {
     return [
@@ -358,8 +358,8 @@ function buildSuggestions(lead, prefs) {
 
   if (/background|campaign|案例|品牌/i.test(latest)) {
     return [
-      { title: '补品牌资料', body: `这里建议先回品牌背景和合作目标。当前品牌资料核心描述：${intro}` },
-      { title: '补案例版', body: '我们建议补一页品牌介绍、过往合作案例和本次目标 KPI，再继续推进。' },
+      { title: '补品牌记忆', body: `这里建议先回品牌背景和合作目标。当前品牌记忆里的核心描述：${intro}` },
+      { title: '补证明材料', body: '建议补品牌介绍、过往合作证明和这次的目标，再继续推进。' },
       { title: '先降复杂度', body: '如果目前资料不全，先给简版介绍和合作方向，再约下一轮更详细沟通。' },
     ]
   }
@@ -433,10 +433,16 @@ function App() {
   const [bulkNextAction, setBulkNextAction] = useState('')
   const [bulkReminderNote, setBulkReminderNote] = useState('')
   const [bulkReminderAt, setBulkReminderAt] = useState('')
+  const visibleBrands = useMemo(() => {
+    if (user?.username === 'demo@fangzhou.ai') {
+      return brands.filter((item) => item.id === 'brand-demo-2')
+    }
+    return brands
+  }, [brands, user])
 
   const activeBrand = useMemo(
-    () => brands.find((item) => item.id === brandId) || brands[0] || null,
-    [brands, brandId],
+    () => visibleBrands.find((item) => item.id === brandId) || visibleBrands[0] || null,
+    [visibleBrands, brandId],
   )
 
   const tasks = useMemo(() => dashboard.tasks || [], [dashboard.tasks])
@@ -523,6 +529,13 @@ function App() {
       .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
       .slice(0, 6)
   }, [currentLeads])
+
+  useEffect(() => {
+    if (!visibleBrands.length) return
+    if (!visibleBrands.some((item) => item.id === brandId)) {
+      setBrandId(visibleBrands[0].id)
+    }
+  }, [visibleBrands, brandId])
 
   useEffect(() => {
     let cancelled = false
@@ -637,7 +650,7 @@ function App() {
     if (!taskPrompt.trim() || !brandId) return
     if (!providerReady) {
       setCurrentPage('channels')
-      setWorkspaceMessage('先去通道页连接默认执行提供方，再创建任务。')
+      setWorkspaceMessage('先去执行入口页把工作区地址填好，再创建任务。')
       return
     }
     setCreatingTask(true)
@@ -804,25 +817,41 @@ function App() {
     }
   }
 
+  async function handleOpenWorkspace() {
+    if (!providerReady) {
+      setCurrentPage('channels')
+      setWorkspaceMessage('先去执行入口页把当前工作区地址填好。')
+      return
+    }
+
+    if (packageContent) {
+      await copyText(packageContent)
+    }
+    openExternal(connectedProvider?.url)
+    setWorkspaceMessage(`执行提示已复制，并已打开 ${connectedProvider?.label}。`)
+  }
+
   function openExternal(url) {
     if (!url) {
-      setWorkspaceMessage('当前默认执行提供方还没有配置地址。')
+      setWorkspaceMessage('当前工作区还没有配置地址。')
       setCurrentPage('channels')
       return
     }
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
-  function openGmail(lead) {
+  function openGmail(lead, draft = '') {
     const to = encodeURIComponent(lead?.email || '')
     const subject = encodeURIComponent(taskSummary.title || '合作沟通')
-    openExternal(`https://mail.google.com/mail/?view=cm&fs=1&to=${to}&su=${subject}`)
+    const body = encodeURIComponent(draft || replyDraft || preferences.channelConfig.gmailSignature || '')
+    openExternal(`https://mail.google.com/mail/?view=cm&fs=1&to=${to}&su=${subject}&body=${body}`)
   }
 
-  function openWhatsApp(lead) {
+  function openWhatsApp(lead, draft = '') {
     const phone = String(lead?.phone || preferences.channelConfig.whatsappNumber || '').replace(/[^\d]/g, '')
     if (!phone) return
-    openExternal(`https://wa.me/${phone}`)
+    const text = encodeURIComponent(draft || replyDraft || '')
+    openExternal(`https://wa.me/${phone}${text ? `?text=${text}` : ''}`)
   }
 
   function openProfile(lead) {
@@ -842,7 +871,7 @@ function App() {
     return (
       <div className="login-layout">
         <section className="login-copy-panel">
-          <p className="eyebrow">Agent Shell</p>
+          <p className="eyebrow">External Ops</p>
           <h1>方洲AI</h1>
           <p className="lead-copy">把目标、执行提示、回填结果和合作资产放在同一个工作区里，别再散在多个网页和聊天窗口。</p>
           <div className="login-points">
@@ -883,14 +912,14 @@ function App() {
           <div className="brand-mark">方</div>
           <div>
             <strong>方洲AI</strong>
-            <p>Outreach Shell</p>
+            <p>跨境外联操作台</p>
           </div>
         </div>
 
         <label className="field subtle">
           <span>品牌空间</span>
           <select value={brandId} onChange={(event) => setBrandId(event.target.value)}>
-            {brands.map((brand) => (
+            {visibleBrands.map((brand) => (
               <option key={brand.id} value={brand.id}>{brand.name}</option>
             ))}
           </select>
@@ -899,8 +928,8 @@ function App() {
         <button className="primary-button full" type="button" onClick={() => setCurrentPage('tasks')}>+ 新建任务</button>
 
         <label className="field subtle">
-          <span>搜索</span>
-          <input placeholder="任务 / 资产 / 市场" value={taskSearch} onChange={(event) => setTaskSearch(event.target.value)} />
+          <span>搜索任务</span>
+          <input placeholder="任务名 / 产品 / 市场" value={taskSearch} onChange={(event) => setTaskSearch(event.target.value)} />
         </label>
 
         <nav className="side-nav">
@@ -983,11 +1012,11 @@ function App() {
 
               <div className={providerReady ? 'connection-banner ready' : 'connection-banner'}>
                 <div>
-                  <strong>{providerReady ? `默认执行提供方：${connectedProvider.label}` : '还没有连接默认执行提供方'}</strong>
-                  <p>{providerReady ? '你创建任务后，系统会按这个入口生成执行提示并引导你派发。' : '先去通道页选择默认执行提供方并填好工作区地址。'}</p>
+                  <strong>{providerReady ? `当前执行工作区：${connectedProvider.label}` : '还没有设置执行工作区'}</strong>
+                  <p>{providerReady ? '创建任务后，系统会整理好执行提示。你只需要打开这个工作区，把提示发过去，再把结果贴回来。' : '先去“执行入口”页填好主工作区或备用工作区的地址。'}</p>
                 </div>
                 <button type="button" className="secondary-button" onClick={() => setCurrentPage('channels')}>
-                  {providerReady ? '调整连接' : '去连接'}
+                  {providerReady ? '执行入口设置' : '去设置入口'}
                 </button>
               </div>
 
@@ -1050,17 +1079,17 @@ function App() {
 
                     <div className="thread-entry assistant">
                       <span className="thread-role">执行提示</span>
-                      <p className="thread-copy">复制下面这段提示，手动发到你已连接的执行提供方工作区，再把结果贴回这里。</p>
+                      <p className="thread-copy">把下面这段提示交给你常用的工作区去执行，再把结果贴回这里。这个环节现在是诚实的手动桥接，不是假装自动化。</p>
                       <textarea className="package-box" value={packageContent} readOnly />
                       <div className="action-row wrap">
                         <button type="button" className="secondary-button" onClick={() => copyText(packageContent).then(() => setWorkspaceMessage('执行提示已复制。'))}>复制执行提示</button>
                         <button type="button" className="secondary-button" onClick={() => downloadText(activeTask.executionPackage?.exportName || 'task.txt', packageContent)}>下载 .txt</button>
-                        <button type="button" className="secondary-button" onClick={() => openExternal(connectedProvider?.url)} disabled={!providerReady}>打开 {connectedProvider?.label || '执行提供方'}</button>
-                        <button type="button" className="secondary-button" onClick={() => setCurrentPage('channels')}>管理提供方</button>
+                        <button type="button" className="primary-button" onClick={handleOpenWorkspace} disabled={!providerReady}>复制并打开工作区</button>
+                        <button type="button" className="secondary-button" onClick={() => setCurrentPage('channels')}>执行入口设置</button>
                       </div>
                       <div className="manual-note">
-                        <strong>当前版本是真实的手动桥接，不是假装自动化。</strong>
-                        <p>也就是说：这里负责生成提示、保留上下文、接收结果。真正的浏览器操作仍然在外部 Agent 那边完成，当前还没有自动派发和自动回流。</p>
+                        <strong>当前版本不会骗你说“已经自动发出去了”。</strong>
+                        <p>这里负责整理任务、带上品牌记忆、接收结果。真正的执行动作仍然在你连接的工作区里完成。</p>
                       </div>
                     </div>
 
@@ -1081,7 +1110,7 @@ function App() {
                 <aside className="task-side-column">
                   <section className="stack-panel">
                     <div className="section-head">
-                      <strong>当前快照</strong>
+                      <strong>任务概览</strong>
                       <span>{activeBrand?.name || '当前品牌'}</span>
                     </div>
                     <div className="snapshot-grid">
@@ -1224,7 +1253,7 @@ function App() {
             <div className="conversation-list">
               <div className="panel-head">
                 <div>
-                  <p className="eyebrow">会话列表</p>
+                  <p className="eyebrow">沟通记录</p>
                   <h3>集中处理回复</h3>
                 </div>
               </div>
@@ -1259,7 +1288,9 @@ function App() {
                   <div className="composer-inline">
                     <textarea placeholder="在这里写回复。系统会把这条消息保存到当前会话。" value={replyDraft} onChange={(event) => setReplyDraft(event.target.value)} />
                     <div className="action-row">
-                      <button type="button" className="primary-button" onClick={handleSendMessage}>保存回复</button>
+                      <button type="button" className="primary-button" onClick={handleSendMessage}>写入沟通记录</button>
+                      <button type="button" className="secondary-button" onClick={() => openGmail(activeLead)}>打开 Gmail 草稿</button>
+                      <button type="button" className="secondary-button" onClick={() => openWhatsApp(activeLead)}>打开 WhatsApp</button>
                       <button type="button" className="secondary-button" onClick={() => handleLeadPatch({ status: '待人工接管', handling: '人工接管' })}>标记待接管</button>
                       <button type="button" className="secondary-button" onClick={() => handleLeadPatch({ status: '洽谈中' })}>标记洽谈中</button>
                     </div>
@@ -1303,49 +1334,73 @@ function App() {
           <section className="form-shell">
             <div className="panel-head">
               <div>
-                <p className="eyebrow">品牌资料</p>
-                <h3>这里是整个系统的知识底座</h3>
+                <p className="eyebrow">品牌记忆库</p>
+                <h3>这里保存品牌长期信息，任务和沟通都会调用这里</h3>
               </div>
             </div>
-            <div className="form-grid two">
-              <label className="field">
-                <span>品牌介绍</span>
-                <textarea value={preferences.brandProfile.intro} onChange={(event) => setPreferences((current) => ({ ...current, brandProfile: { ...current.brandProfile, intro: event.target.value } }))} />
-              </label>
-              <label className="field">
-                <span>本季度主推</span>
-                <textarea value={preferences.brandProfile.quarterFocus} onChange={(event) => setPreferences((current) => ({ ...current, brandProfile: { ...current.brandProfile, quarterFocus: event.target.value } }))} />
-              </label>
-              <label className="field">
-                <span>主力产品</span>
-                <textarea value={preferences.brandProfile.primaryProducts} onChange={(event) => setPreferences((current) => ({ ...current, brandProfile: { ...current.brandProfile, primaryProducts: event.target.value } }))} />
-              </label>
-              <label className="field">
-                <span>产品链接</span>
-                <textarea value={preferences.brandProfile.productLinks} onChange={(event) => setPreferences((current) => ({ ...current, brandProfile: { ...current.brandProfile, productLinks: event.target.value } }))} />
-              </label>
-              <label className="field">
-                <span>价格策略</span>
-                <textarea value={preferences.brandProfile.pricingStrategy} onChange={(event) => setPreferences((current) => ({ ...current, brandProfile: { ...current.brandProfile, pricingStrategy: event.target.value } }))} />
-              </label>
-              <label className="field">
-                <span>产品卖点</span>
-                <textarea value={preferences.brandProfile.productPoints} onChange={(event) => setPreferences((current) => ({ ...current, brandProfile: { ...current.brandProfile, productPoints: event.target.value } }))} />
-              </label>
-              <label className="field">
-                <span>合作方式</span>
-                <textarea value={preferences.brandProfile.cooperationModes} onChange={(event) => setPreferences((current) => ({ ...current, brandProfile: { ...current.brandProfile, cooperationModes: event.target.value } }))} />
-              </label>
-              <label className="field">
-                <span>案例与证明</span>
-                <textarea value={preferences.brandProfile.campaignProof} onChange={(event) => setPreferences((current) => ({ ...current, brandProfile: { ...current.brandProfile, campaignProof: event.target.value } }))} />
-              </label>
-              <label className="field full">
-                <span>常见问答</span>
-                <textarea value={preferences.brandProfile.faq} onChange={(event) => setPreferences((current) => ({ ...current, brandProfile: { ...current.brandProfile, faq: event.target.value } }))} />
-              </label>
+            <div className="stack-panel">
+              <div className="section-head">
+                <strong>品牌定位</strong>
+                <span>让系统知道你是谁、这一季在推什么</span>
+              </div>
+              <div className="form-grid two">
+                <label className="field">
+                  <span>品牌背景</span>
+                  <textarea value={preferences.brandProfile.intro} onChange={(event) => setPreferences((current) => ({ ...current, brandProfile: { ...current.brandProfile, intro: event.target.value } }))} />
+                </label>
+                <label className="field">
+                  <span>本季度主推</span>
+                  <textarea value={preferences.brandProfile.quarterFocus} onChange={(event) => setPreferences((current) => ({ ...current, brandProfile: { ...current.brandProfile, quarterFocus: event.target.value } }))} />
+                </label>
+              </div>
             </div>
-            <button className="primary-button" type="button" onClick={handleSavePreferences} disabled={savingPreferences}>{savingPreferences ? '保存中…' : '保存品牌资料'}</button>
+
+            <div className="stack-panel">
+              <div className="section-head">
+                <strong>产品与策略</strong>
+                <span>决定系统怎么写、怎么谈、怎么筛</span>
+              </div>
+              <div className="form-grid two">
+                <label className="field">
+                  <span>主要产品</span>
+                  <textarea value={preferences.brandProfile.primaryProducts} onChange={(event) => setPreferences((current) => ({ ...current, brandProfile: { ...current.brandProfile, primaryProducts: event.target.value } }))} />
+                </label>
+                <label className="field">
+                  <span>产品链接</span>
+                  <textarea value={preferences.brandProfile.productLinks} onChange={(event) => setPreferences((current) => ({ ...current, brandProfile: { ...current.brandProfile, productLinks: event.target.value } }))} />
+                </label>
+                <label className="field">
+                  <span>价格策略</span>
+                  <textarea value={preferences.brandProfile.pricingStrategy} onChange={(event) => setPreferences((current) => ({ ...current, brandProfile: { ...current.brandProfile, pricingStrategy: event.target.value } }))} />
+                </label>
+                <label className="field">
+                  <span>核心卖点</span>
+                  <textarea value={preferences.brandProfile.productPoints} onChange={(event) => setPreferences((current) => ({ ...current, brandProfile: { ...current.brandProfile, productPoints: event.target.value } }))} />
+                </label>
+              </div>
+            </div>
+
+            <div className="stack-panel">
+              <div className="section-head">
+                <strong>合作素材</strong>
+                <span>这里的内容会被回复建议和执行提示反复调用</span>
+              </div>
+              <div className="form-grid two">
+                <label className="field">
+                  <span>可接受合作方式</span>
+                  <textarea value={preferences.brandProfile.cooperationModes} onChange={(event) => setPreferences((current) => ({ ...current, brandProfile: { ...current.brandProfile, cooperationModes: event.target.value } }))} />
+                </label>
+                <label className="field">
+                  <span>过往合作证明</span>
+                  <textarea value={preferences.brandProfile.campaignProof} onChange={(event) => setPreferences((current) => ({ ...current, brandProfile: { ...current.brandProfile, campaignProof: event.target.value } }))} />
+                </label>
+                <label className="field full">
+                  <span>常用回复素材</span>
+                  <textarea value={preferences.brandProfile.faq} onChange={(event) => setPreferences((current) => ({ ...current, brandProfile: { ...current.brandProfile, faq: event.target.value } }))} />
+                </label>
+              </div>
+            </div>
+            <button className="primary-button" type="button" onClick={handleSavePreferences} disabled={savingPreferences}>{savingPreferences ? '保存中…' : '保存品牌记忆'}</button>
           </section>
         ) : null}
 
@@ -1353,8 +1408,8 @@ function App() {
           <section className="form-shell">
             <div className="panel-head">
               <div>
-                <p className="eyebrow">通道</p>
-                <h3>先连接默认执行提供方，再把任务派给它</h3>
+                <p className="eyebrow">执行入口</p>
+                <h3>先把常用工作区地址放在这里，再从任务页跳过去执行</h3>
               </div>
             </div>
 
@@ -1390,19 +1445,19 @@ function App() {
 
             <div className="form-grid two">
               <label className="field">
-                <span>执行提供方 A 名称</span>
+                <span>主工作区名称</span>
                 <input value={preferences.channelConfig.opencloudName} onChange={(event) => setPreferences((current) => ({ ...current, channelConfig: { ...current.channelConfig, opencloudName: event.target.value } }))} />
               </label>
               <label className="field">
-                <span>执行提供方 A 地址</span>
+                <span>主工作区地址</span>
                 <input value={preferences.channelConfig.opencloudUrl} onChange={(event) => setPreferences((current) => ({ ...current, channelConfig: { ...current.channelConfig, opencloudUrl: event.target.value } }))} />
               </label>
               <label className="field">
-                <span>执行提供方 B 名称</span>
+                <span>备用工作区名称</span>
                 <input value={preferences.channelConfig.codexName} onChange={(event) => setPreferences((current) => ({ ...current, channelConfig: { ...current.channelConfig, codexName: event.target.value } }))} />
               </label>
               <label className="field">
-                <span>执行提供方 B 地址</span>
+                <span>备用工作区地址</span>
                 <input value={preferences.channelConfig.codexUrl} onChange={(event) => setPreferences((current) => ({ ...current, channelConfig: { ...current.channelConfig, codexUrl: event.target.value } }))} />
               </label>
               <label className="field">
@@ -1419,7 +1474,7 @@ function App() {
               </label>
             </div>
 
-            <button className="primary-button" type="button" onClick={handleSavePreferences} disabled={savingPreferences}>{savingPreferences ? '保存中…' : '保存通道配置'}</button>
+            <button className="primary-button" type="button" onClick={handleSavePreferences} disabled={savingPreferences}>{savingPreferences ? '保存中…' : '保存执行入口'}</button>
           </section>
         ) : null}
 
