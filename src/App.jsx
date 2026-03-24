@@ -57,13 +57,20 @@ const emptyDashboard = {
 const defaultPreferences = {
   brandProfile: {
     intro: '',
+    primaryProducts: '',
+    productLinks: '',
+    quarterFocus: '',
+    pricingStrategy: '',
     productPoints: '',
     cooperationModes: '',
     campaignProof: '',
     faq: '',
   },
   channelConfig: {
+    provider: 'opencloud',
+    opencloudName: 'OpenCloud',
     opencloudUrl: 'https://app.opencloud.com',
+    codexName: 'ChatGPT / CloudX',
     codexUrl: 'https://chatgpt.com',
     gmailSender: '',
     gmailSignature: 'Best regards,\nFangzhou AI',
@@ -233,12 +240,12 @@ function buildTaskDraft(prompt) {
 function channelState(config) {
   return [
     {
-      name: '执行通道 A',
+      name: config.opencloudName || 'OpenCloud',
       status: config.opencloudUrl ? '已配置工作入口' : '未配置',
       description: '这里填你的主执行入口，例如 OpenCloud、小龙虾或其他浏览器 Agent。',
     },
     {
-      name: '执行通道 B',
+      name: config.codexName || 'ChatGPT / CloudX',
       status: config.codexUrl ? '已配置工作入口' : '未配置',
       description: '这里填第二执行入口，例如 ChatGPT、CloudX 或备用工作区。',
     },
@@ -252,6 +259,32 @@ function channelState(config) {
       status: config.whatsappNumber ? `已配置号码：${config.whatsappNumber}` : '未配置号码',
       description: '用于从资产页直接打开对话入口。',
     },
+  ]
+}
+
+function getProviderOptions(config) {
+  return [
+    {
+      id: 'opencloud',
+      label: config.opencloudName || 'OpenCloud',
+      url: config.opencloudUrl,
+      hint: '主执行入口',
+    },
+    {
+      id: 'codex',
+      label: config.codexName || 'ChatGPT / CloudX',
+      url: config.codexUrl,
+      hint: '备用执行入口',
+    },
+  ]
+}
+
+function buildMemoryDigest(profile) {
+  return [
+    { label: '本季度主推', value: profile.quarterFocus || '还没写' },
+    { label: '主力产品', value: profile.primaryProducts || '还没写' },
+    { label: '价格策略', value: profile.pricingStrategy || '还没写' },
+    { label: '产品链接', value: profile.productLinks || '还没写' },
   ]
 }
 
@@ -406,6 +439,10 @@ function App() {
   const packageContent = useMemo(() => normalizePackageContent(activeTask?.executionPackage?.content || ''), [activeTask])
   const currentPageLabel = useMemo(() => navItems.find((item) => item.id === currentPage)?.label || '任务', [currentPage])
   const activeTaskStatus = displayTaskStatus(activeTask?.status)
+  const providerOptions = useMemo(() => getProviderOptions(preferences.channelConfig), [preferences.channelConfig])
+  const connectedProvider = useMemo(() => providerOptions.find((item) => item.id === preferences.channelConfig.provider) || providerOptions[0], [providerOptions, preferences.channelConfig.provider])
+  const providerReady = Boolean(connectedProvider?.url)
+  const memoryDigest = useMemo(() => buildMemoryDigest(preferences.brandProfile), [preferences.brandProfile])
 
   const taskCounts = useMemo(() => {
     const counts = Object.fromEntries(funnelOrder.map((item) => [item, 0]))
@@ -533,6 +570,11 @@ function App() {
 
   async function handleCreateTask() {
     if (!taskPrompt.trim() || !brandId) return
+    if (!providerReady) {
+      setCurrentPage('channels')
+      setWorkspaceMessage('先去通道页连接默认执行提供方，再创建任务。')
+      return
+    }
     setCreatingTask(true)
     setWorkspaceMessage('')
 
@@ -698,7 +740,11 @@ function App() {
   }
 
   function openExternal(url) {
-    if (!url) return
+    if (!url) {
+      setWorkspaceMessage('当前默认执行提供方还没有配置地址。')
+      setCurrentPage('channels')
+      return
+    }
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
@@ -864,6 +910,16 @@ function App() {
                 <span className="sub-note">像 ChatGPT 一样先输入目标，再把系统生成的执行提示交给外部 Agent。</span>
               </div>
 
+              <div className={providerReady ? 'connection-banner ready' : 'connection-banner'}>
+                <div>
+                  <strong>{providerReady ? `默认执行提供方：${connectedProvider.label}` : '还没有连接默认执行提供方'}</strong>
+                  <p>{providerReady ? '你创建任务后，系统会按这个入口生成执行提示并引导你派发。' : '先去通道页选择默认执行提供方并填好工作区地址。'}</p>
+                </div>
+                <button type="button" className="secondary-button" onClick={() => setCurrentPage('channels')}>
+                  {providerReady ? '调整连接' : '去连接'}
+                </button>
+              </div>
+
               <textarea className="hero-input" placeholder="例如：帮我创建一个美国市场的创作者外联任务，目标 50 位，优先 TikTok 和 Instagram，合作方式为寄样 + 佣金。" value={taskPrompt} onChange={(event) => setTaskPrompt(event.target.value)} />
 
               <div className="prompt-row">
@@ -912,6 +968,21 @@ function App() {
                       </div>
                     ))}
                   </div>
+
+                  <div className="memory-panel">
+                    <div className="section-head">
+                      <strong>品牌记忆</strong>
+                      <span>{activeBrand?.name || '当前品牌'}</span>
+                    </div>
+                    <div className="memory-grid">
+                      {memoryDigest.map((item) => (
+                        <div key={item.label} className="memory-card">
+                          <span>{item.label}</span>
+                          <strong>{item.value}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </section>
 
                 <section className="stack-panel thread-panel">
@@ -944,10 +1015,10 @@ function App() {
                     <div className="action-row wrap">
                       <button type="button" className="secondary-button" onClick={() => copyText(packageContent).then(() => setWorkspaceMessage('执行提示已复制。'))}>复制执行提示</button>
                       <button type="button" className="secondary-button" onClick={() => downloadText(activeTask.executionPackage?.exportName || 'task.txt', packageContent)}>下载 .txt</button>
-                      <button type="button" className="secondary-button" onClick={() => openExternal(preferences.channelConfig.opencloudUrl)}>打开执行通道 A</button>
-                      <button type="button" className="secondary-button" onClick={() => openExternal(preferences.channelConfig.codexUrl)}>打开执行通道 B</button>
-                      <button type="button" className="secondary-button" onClick={handleSubmitTask}>我已发给外部 Agent</button>
-                      <button type="button" className="secondary-button" onClick={handleMarkRefill}>等待贴回结果</button>
+                      <button type="button" className="secondary-button" onClick={() => openExternal(connectedProvider?.url)} disabled={!providerReady}>打开已连接提供方</button>
+                      <button type="button" className="secondary-button" onClick={() => setCurrentPage('channels')}>切换执行提供方</button>
+                      <button type="button" className="secondary-button" onClick={handleSubmitTask} disabled={!providerReady}>我已发给外部 Agent</button>
+                      <button type="button" className="secondary-button" onClick={handleMarkRefill} disabled={!providerReady}>等待贴回结果</button>
                     </div>
                   </div>
 
@@ -1163,6 +1234,22 @@ function App() {
                 <textarea value={preferences.brandProfile.intro} onChange={(event) => setPreferences((current) => ({ ...current, brandProfile: { ...current.brandProfile, intro: event.target.value } }))} />
               </label>
               <label className="field">
+                <span>本季度主推</span>
+                <textarea value={preferences.brandProfile.quarterFocus} onChange={(event) => setPreferences((current) => ({ ...current, brandProfile: { ...current.brandProfile, quarterFocus: event.target.value } }))} />
+              </label>
+              <label className="field">
+                <span>主力产品</span>
+                <textarea value={preferences.brandProfile.primaryProducts} onChange={(event) => setPreferences((current) => ({ ...current, brandProfile: { ...current.brandProfile, primaryProducts: event.target.value } }))} />
+              </label>
+              <label className="field">
+                <span>产品链接</span>
+                <textarea value={preferences.brandProfile.productLinks} onChange={(event) => setPreferences((current) => ({ ...current, brandProfile: { ...current.brandProfile, productLinks: event.target.value } }))} />
+              </label>
+              <label className="field">
+                <span>价格策略</span>
+                <textarea value={preferences.brandProfile.pricingStrategy} onChange={(event) => setPreferences((current) => ({ ...current, brandProfile: { ...current.brandProfile, pricingStrategy: event.target.value } }))} />
+              </label>
+              <label className="field">
                 <span>产品卖点</span>
                 <textarea value={preferences.brandProfile.productPoints} onChange={(event) => setPreferences((current) => ({ ...current, brandProfile: { ...current.brandProfile, productPoints: event.target.value } }))} />
               </label>
@@ -1188,8 +1275,28 @@ function App() {
             <div className="panel-head">
               <div>
                 <p className="eyebrow">通道</p>
-                <h3>这里只配置入口，不假装替你打通所有平台私信</h3>
+                <h3>先连接默认执行提供方，再把任务派给它</h3>
               </div>
+            </div>
+
+            <div className="provider-picker">
+              {providerOptions.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={preferences.channelConfig.provider === item.id ? 'provider-card active' : 'provider-card'}
+                  onClick={() =>
+                    setPreferences((current) => ({
+                      ...current,
+                      channelConfig: { ...current.channelConfig, provider: item.id },
+                    }))
+                  }
+                >
+                  <strong>{item.label}</strong>
+                  <span>{item.hint}</span>
+                  <em>{item.url ? '已配置地址' : '还没配置地址'}</em>
+                </button>
+              ))}
             </div>
 
             <div className="channel-grid">
@@ -1204,11 +1311,19 @@ function App() {
 
             <div className="form-grid two">
               <label className="field">
-                <span>执行通道 A 地址</span>
+                <span>执行提供方 A 名称</span>
+                <input value={preferences.channelConfig.opencloudName} onChange={(event) => setPreferences((current) => ({ ...current, channelConfig: { ...current.channelConfig, opencloudName: event.target.value } }))} />
+              </label>
+              <label className="field">
+                <span>执行提供方 A 地址</span>
                 <input value={preferences.channelConfig.opencloudUrl} onChange={(event) => setPreferences((current) => ({ ...current, channelConfig: { ...current.channelConfig, opencloudUrl: event.target.value } }))} />
               </label>
               <label className="field">
-                <span>执行通道 B 地址</span>
+                <span>执行提供方 B 名称</span>
+                <input value={preferences.channelConfig.codexName} onChange={(event) => setPreferences((current) => ({ ...current, channelConfig: { ...current.channelConfig, codexName: event.target.value } }))} />
+              </label>
+              <label className="field">
+                <span>执行提供方 B 地址</span>
                 <input value={preferences.channelConfig.codexUrl} onChange={(event) => setPreferences((current) => ({ ...current, channelConfig: { ...current.channelConfig, codexUrl: event.target.value } }))} />
               </label>
               <label className="field">

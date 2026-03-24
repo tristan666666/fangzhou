@@ -282,6 +282,13 @@
   color: #ececec;
 }
 
+.sidebar-group {
+  padding: 10px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
 .brand-mark {
   width: 44px;
   height: 44px;
@@ -319,7 +326,7 @@
 .task-chip,
 .conversation-chip {
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.07);
   color: #edf3ef;
   padding: 12px;
   text-align: left;
@@ -331,7 +338,7 @@
 .conversation-chip span,
 .empty-copy {
   font-size: 13px;
-  color: rgba(237, 243, 239, 0.7);
+  color: rgba(237, 243, 239, 0.78);
 }
 
 .task-chip em {
@@ -367,6 +374,34 @@
   background: rgba(16, 163, 127, 0.08);
   border: 1px solid rgba(16, 163, 127, 0.16);
   color: #1e5e4d;
+}
+
+.connection-banner,
+.memory-panel,
+.provider-picker {
+  display: grid;
+  gap: 12px;
+}
+
+.connection-banner {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid #e6e7eb;
+  background: #fafafa;
+}
+
+.connection-banner.ready {
+  background: rgba(16, 163, 127, 0.08);
+  border-color: rgba(16, 163, 127, 0.18);
+}
+
+.connection-banner p,
+.memory-card,
+.provider-card span,
+.provider-card em {
+  margin: 0;
 }
 
 .page-shell {
@@ -439,6 +474,32 @@
 .thread-copy {
   margin: 0;
   color: rgba(22, 36, 28, 0.72);
+}
+
+.memory-grid,
+.provider-picker {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.memory-card,
+.provider-card {
+  border-radius: 16px;
+  border: 1px solid #e6e7eb;
+  background: #fafafa;
+  padding: 14px;
+  display: grid;
+  gap: 6px;
+  text-align: left;
+}
+
+.provider-card.active {
+  background: rgba(16, 163, 127, 0.1);
+  border-color: rgba(16, 163, 127, 0.24);
+}
+
+.provider-card em {
+  font-size: 12px;
+  color: rgba(22, 36, 28, 0.58);
 }
 
 .panel-head {
@@ -771,7 +832,10 @@
   .conversation-shell,
   .form-grid.two,
   .channel-grid,
-  .draft-grid {
+  .draft-grid,
+  .memory-grid,
+  .provider-picker,
+  .connection-banner {
     grid-template-columns: 1fr;
   }
 

@@ -81,13 +81,20 @@ function defaultPreferences() {
   return {
     brandProfile: {
       intro: '我们是一套套在外部 Agent 之上的跨境外联业务壳层，负责统一记忆、任务编排、回填和资产沉淀。',
+      primaryProducts: '恢复类设备、居家健身配件、健康生活方式产品',
+      productLinks: 'https://example.com/product-1\nhttps://example.com/product-2',
+      quarterFocus: '本季度优先推动恢复类设备和礼品合作切口。',
+      pricingStrategy: '默认寄样 + 佣金，优先控制固定费用，必要时根据对象级别单独放宽。',
       productPoints: '恢复类设备 / 居家健身 / 健康生活方式',
       cooperationModes: '寄样 + 佣金，优先长期合作，默认不接受固定坑位费',
       campaignProof: '首轮重点验证 TikTok / Instagram / YouTube / Deal 站的外联效率和回填闭环。',
       faq: '是否支持寄样、佣金边界、物流周期、品牌卖点、竞品差异。',
     },
     channelConfig: {
+      provider: 'opencloud',
+      opencloudName: 'OpenCloud',
       opencloudUrl: 'https://app.opencloud.com',
+      codexName: 'ChatGPT / CloudX',
       codexUrl: 'https://chatgpt.com',
       gmailSender: '',
       gmailSignature: 'Best regards,\nFangzhou AI',
