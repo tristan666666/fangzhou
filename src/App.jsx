@@ -848,83 +848,90 @@ function App() {
               </div>
             </div>
 
-            <div className="task-workspace">
-              <section className="stack-panel">
-                <div className="panel-head">
-                  <div>
-                    <p className="eyebrow">当前任务</p>
-                    <h3>{taskSummary.title}</h3>
-                  </div>
-                  <em className={`status-pill ${statusClass(activeTask?.status)}`}>{activeTask?.status || '暂无任务'}</em>
-                </div>
-
-                <div className="meta-grid">
-                  <div><span>产品</span><strong>{taskSummary.product}</strong></div>
-                  <div><span>市场</span><strong>{taskSummary.market}</strong></div>
-                  <div><span>平台</span><strong>{taskSummary.platforms}</strong></div>
-                  <div><span>触达方式</span><strong>{taskSummary.channel}</strong></div>
-                  <div className="wide"><span>合作约束</span><strong>{taskSummary.constraints}</strong></div>
-                </div>
-
-                <div className="funnel-strip">
-                  {funnelOrder.map((item) => (
-                    <div key={item} className="funnel-item">
-                      <span>{item}</span>
-                      <strong>{taskCounts[item] || 0}</strong>
+            {activeTask ? (
+              <div className="task-workspace">
+                <section className="stack-panel">
+                  <div className="panel-head">
+                    <div>
+                      <p className="eyebrow">当前任务</p>
+                      <h3>{taskSummary.title}</h3>
                     </div>
-                  ))}
-                </div>
+                    <em className={`status-pill ${statusClass(activeTask?.status)}`}>{activeTask?.status}</em>
+                  </div>
 
-                <div className="timeline-block">
-                  <div className="section-head"><strong>任务记录</strong></div>
-                  <div className="timeline-list">
-                    {(activeTask?.logs || []).map((log, index) => (
-                      <div key={`${log.at}-${index}`} className="timeline-row">
-                        <span>{shortDate(log.at)}</span>
-                        <p>{log.message}</p>
+                  <div className="meta-grid">
+                    <div><span>产品</span><strong>{taskSummary.product}</strong></div>
+                    <div><span>市场</span><strong>{taskSummary.market}</strong></div>
+                    <div><span>平台</span><strong>{taskSummary.platforms}</strong></div>
+                    <div><span>触达方式</span><strong>{taskSummary.channel}</strong></div>
+                    <div className="wide"><span>合作约束</span><strong>{taskSummary.constraints}</strong></div>
+                  </div>
+
+                  <div className="funnel-strip">
+                    {funnelOrder.map((item) => (
+                      <div key={item} className="funnel-item">
+                        <span>{item}</span>
+                        <strong>{taskCounts[item] || 0}</strong>
                       </div>
                     ))}
                   </div>
-                </div>
-              </section>
 
-              <section className="stack-panel">
-                <div className="panel-head">
-                  <div>
-                    <p className="eyebrow">执行</p>
-                    <h3>复制提示，去外部 Agent 跑，再把结果贴回来</h3>
+                  <div className="timeline-block">
+                    <div className="section-head"><strong>任务记录</strong></div>
+                    <div className="timeline-list">
+                      {(activeTask.logs || []).map((log, index) => (
+                        <div key={`${log.at}-${index}`} className="timeline-row">
+                          <span>{shortDate(log.at)}</span>
+                          <p>{log.message}</p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                </section>
 
-                <ol className="step-list">
-                  <li>复制下面这段执行提示。</li>
-                  <li>到小龙虾 OpenCloud 或 ChatGPT / CloudX 里粘贴运行。</li>
-                  <li>把结果贴回这里，系统会同步更新任务、会话和资产。</li>
-                </ol>
+                <section className="stack-panel">
+                  <div className="panel-head">
+                    <div>
+                      <p className="eyebrow">执行</p>
+                      <h3>复制提示，去外部 Agent 跑，再把结果贴回来</h3>
+                    </div>
+                  </div>
 
-                <textarea className="package-box" value={packageContent} readOnly />
+                  <ol className="step-list">
+                    <li>复制下面这段执行提示。</li>
+                    <li>到小龙虾 OpenCloud 或 ChatGPT / CloudX 里粘贴运行。</li>
+                    <li>把结果贴回这里，系统会同步更新任务、会话和资产。</li>
+                  </ol>
 
-                <div className="action-row wrap">
-                  <button type="button" className="secondary-button" onClick={() => copyText(packageContent).then(() => setWorkspaceMessage('执行提示已复制。'))}>复制执行提示</button>
-                  <button type="button" className="secondary-button" onClick={() => downloadText(activeTask?.executionPackage?.exportName || 'task.txt', packageContent)}>下载 .txt</button>
-                  <button type="button" className="secondary-button" onClick={() => openExternal(preferences.channelConfig.opencloudUrl)}>打开小龙虾 OpenCloud</button>
-                  <button type="button" className="secondary-button" onClick={() => openExternal(preferences.channelConfig.codexUrl)}>打开 ChatGPT / CloudX</button>
-                  <button type="button" className="secondary-button" onClick={handleSubmitTask}>标记已发送</button>
-                  <button type="button" className="secondary-button" onClick={handleMarkRefill}>准备粘贴结果</button>
-                </div>
+                  <textarea className="package-box" value={packageContent} readOnly />
 
-                <label className="field">
-                  <span>结果回填</span>
-                  <textarea className="refill-box" placeholder="把外部 Agent 跑完后的结果粘贴到这里。" value={refillDraft} onChange={(event) => setRefillDraft(event.target.value)} />
-                </label>
+                  <div className="action-row wrap">
+                    <button type="button" className="secondary-button" onClick={() => copyText(packageContent).then(() => setWorkspaceMessage('执行提示已复制。'))}>复制执行提示</button>
+                    <button type="button" className="secondary-button" onClick={() => downloadText(activeTask.executionPackage?.exportName || 'task.txt', packageContent)}>下载 .txt</button>
+                    <button type="button" className="secondary-button" onClick={() => openExternal(preferences.channelConfig.opencloudUrl)}>打开小龙虾 OpenCloud</button>
+                    <button type="button" className="secondary-button" onClick={() => openExternal(preferences.channelConfig.codexUrl)}>打开 ChatGPT / CloudX</button>
+                    <button type="button" className="secondary-button" onClick={handleSubmitTask}>标记已发送</button>
+                    <button type="button" className="secondary-button" onClick={handleMarkRefill}>准备粘贴结果</button>
+                  </div>
 
-                <div className="action-row">
-                  <button type="button" className="primary-button" onClick={handleRefill}>写入结果</button>
-                </div>
+                  <label className="field">
+                    <span>结果回填</span>
+                    <textarea className="refill-box" placeholder="把外部 Agent 跑完后的结果粘贴到这里。" value={refillDraft} onChange={(event) => setRefillDraft(event.target.value)} />
+                  </label>
 
-                {activeTask?.refill ? <div className="result-block"><strong>最近一次结果摘要</strong><p>{activeTask.refill.summary}</p></div> : null}
-              </section>
-            </div>
+                  <div className="action-row">
+                    <button type="button" className="primary-button" onClick={handleRefill}>写入结果</button>
+                  </div>
+
+                  {activeTask.refill ? <div className="result-block"><strong>最近一次结果摘要</strong><p>{activeTask.refill.summary}</p></div> : null}
+                </section>
+              </div>
+            ) : (
+              <div className="empty-workspace">
+                <strong>还没有任务</strong>
+                <p>先在上面的主输入框里写一个目标。创建后，这里会出现执行提示、进度和结果回填。</p>
+              </div>
+            )}
           </section>
         ) : null}
 
@@ -956,32 +963,39 @@ function App() {
               </div>
             ) : null}
 
-            <div className="table-shell">
-              <div className="table-head">
-                <span />
-                <span>名称</span>
-                <span>类型 / 平台</span>
-                <span>匹配度</span>
-                <span>状态</span>
-                <span>处理方式</span>
-                <span>下一步</span>
+            {filteredLeads.length ? (
+              <div className="table-shell">
+                <div className="table-head">
+                  <span />
+                  <span>名称</span>
+                  <span>类型 / 平台</span>
+                  <span>匹配度</span>
+                  <span>状态</span>
+                  <span>处理方式</span>
+                  <span>下一步</span>
+                </div>
+                {filteredLeads.map((lead) => (
+                  <button key={lead.id} type="button" className={activeLead?.id === lead.id ? 'table-row active' : 'table-row'} onClick={() => setSelectedLeadId(lead.id)}>
+                    <span onClick={(event) => event.stopPropagation()}>
+                      <input type="checkbox" checked={selectedLeadIds.includes(lead.id)} onChange={() => toggleLeadSelection(lead.id)} />
+                    </span>
+                    <span><strong>{lead.name}</strong><small>{lead.followers}</small></span>
+                    <span>{lead.platform}</span>
+                    <span>{lead.fitScore}</span>
+                    <span><em className={`status-pill ${statusClass(lead.status)}`}>{lead.status}</em></span>
+                    <span>{lead.handling}</span>
+                    <span>{lead.nextAction}</span>
+                  </button>
+                ))}
               </div>
-              {filteredLeads.map((lead) => (
-                <button key={lead.id} type="button" className={activeLead?.id === lead.id ? 'table-row active' : 'table-row'} onClick={() => setSelectedLeadId(lead.id)}>
-                  <span onClick={(event) => event.stopPropagation()}>
-                    <input type="checkbox" checked={selectedLeadIds.includes(lead.id)} onChange={() => toggleLeadSelection(lead.id)} />
-                  </span>
-                  <span><strong>{lead.name}</strong><small>{lead.followers}</small></span>
-                  <span>{lead.platform}</span>
-                  <span>{lead.fitScore}</span>
-                  <span><em className={`status-pill ${statusClass(lead.status)}`}>{lead.status}</em></span>
-                  <span>{lead.handling}</span>
-                  <span>{lead.nextAction}</span>
-                </button>
-              ))}
-            </div>
+            ) : (
+              <div className="empty-workspace">
+                <strong>当前还没有资产</strong>
+                <p>先创建任务并回填结果，系统才会在这里沉淀对象、状态和下一步动作。</p>
+              </div>
+            )}
 
-            {activeLead ? (
+            {filteredLeads.length && activeLead ? (
               <div className="stack-panel">
                 <div className="panel-head">
                   <div>
@@ -1014,12 +1028,12 @@ function App() {
                   <h3>集中处理回复</h3>
                 </div>
               </div>
-              {recentConversations.map((lead) => (
+              {recentConversations.length ? recentConversations.map((lead) => (
                 <button key={lead.id} type="button" className={activeLead?.id === lead.id ? 'conversation-chip active' : 'conversation-chip'} onClick={() => { setSelectedTaskId(lead.taskId); setSelectedLeadId(lead.id) }}>
                   <strong>{lead.name}</strong>
                   <span>{lead.platform} · {lead.status}</span>
                 </button>
-              ))}
+              )) : <div className="empty-copy dark">还没有需要处理的会话。</div>}
             </div>
 
             <div className="message-shell">
@@ -1031,23 +1045,32 @@ function App() {
                 {activeLead ? <em className={`status-pill ${statusClass(activeLead.status)}`}>{activeLead.status}</em> : null}
               </div>
 
-              <div className="message-list">
-                {(activeLead?.conversation || []).map((message) => (
-                  <div key={message.id} className={`message-bubble ${message.role === 'creator' ? 'incoming' : 'outgoing'}`}>
-                    <span>{message.role === 'creator' ? '对方' : message.role === 'agent' ? '我方' : '系统'}</span>
-                    <p>{message.text}</p>
+              {activeLead ? (
+                <>
+                  <div className="message-list">
+                    {(activeLead.conversation || []).map((message) => (
+                      <div key={message.id} className={`message-bubble ${message.role === 'creator' ? 'incoming' : 'outgoing'}`}>
+                        <span>{message.role === 'creator' ? '对方' : message.role === 'agent' ? '我方' : '系统'}</span>
+                        <p>{message.text}</p>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
 
-              <div className="composer-inline">
-                <textarea placeholder="在这里写回复。系统会把这条消息保存到当前会话。" value={replyDraft} onChange={(event) => setReplyDraft(event.target.value)} />
-                <div className="action-row">
-                  <button type="button" className="primary-button" onClick={handleSendMessage}>保存回复</button>
-                  <button type="button" className="secondary-button" onClick={() => handleLeadPatch({ status: '待人工接管', handling: '人工接管' })}>标记待接管</button>
-                  <button type="button" className="secondary-button" onClick={() => handleLeadPatch({ status: '洽谈中' })}>标记洽谈中</button>
+                  <div className="composer-inline">
+                    <textarea placeholder="在这里写回复。系统会把这条消息保存到当前会话。" value={replyDraft} onChange={(event) => setReplyDraft(event.target.value)} />
+                    <div className="action-row">
+                      <button type="button" className="primary-button" onClick={handleSendMessage}>保存回复</button>
+                      <button type="button" className="secondary-button" onClick={() => handleLeadPatch({ status: '待人工接管', handling: '人工接管' })}>标记待接管</button>
+                      <button type="button" className="secondary-button" onClick={() => handleLeadPatch({ status: '洽谈中' })}>标记洽谈中</button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="empty-workspace compact">
+                  <strong>还没有会话</strong>
+                  <p>等任务回填并产生对象后，这里会集中处理回复和跟进。</p>
                 </div>
-              </div>
+              )}
             </div>
 
             <div className="assistant-shell">
