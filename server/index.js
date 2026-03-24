@@ -45,11 +45,11 @@ const modules = [
     name: '流量获取',
     status: '当前主打',
     locked: false,
-    description: '围绕红人BD、Deal站、媒体PR和渠道拓展，先做最容易卖、最容易验证的增长模块。',
+    description: '围绕创作者外联、渠道站点、媒体合作和联盟拓展，先做最容易卖、最容易验证的增长模块。',
     quickTasks: [
-      '为品牌输出本周 50 个 TikTok 红人名单',
-      '为 10 个中腰部红人生成首轮建联话术',
-      '整理本周可推进的 Deal 站和媒体名单',
+      '为品牌输出本周 50 个创作者合作对象',
+      '为 10 个重点对象生成首轮外联话术',
+      '整理本周可推进的渠道站点和媒体名单',
     ],
   },
   {
@@ -81,7 +81,7 @@ function defaultPreferences() {
   return {
     brandProfile: {
       intro: '我们是一套套在外部 Agent 之上的跨境外联业务壳层，负责统一记忆、任务编排、回填和资产沉淀。',
-      productPoints: '筋膜枪 / 恢复类设备 / 居家健身',
+      productPoints: '恢复类设备 / 居家健身 / 健康生活方式',
       cooperationModes: '寄样 + 佣金，优先长期合作，默认不接受固定坑位费',
       campaignProof: '首轮重点验证 TikTok / Instagram / YouTube / Deal 站的外联效率和回填闭环。',
       faq: '是否支持寄样、佣金边界、物流周期、品牌卖点、竞品差异。',
@@ -140,8 +140,8 @@ function detectServiceTrack(instruction) {
 
   if (/中腰|话术|跟进|合作|reply|dm|邮件/.test(text)) {
     return {
-      name: '辅助BD',
-      description: '中腰部红人由 AI 辅助拆解与生成建联话术。',
+      name: 'AI辅助处理',
+      description: '中等复杂度对象由 AI 辅助拆解并生成外联话术。',
       deliverables: ['分层名单', '首轮话术', '跟进节奏', '风险提醒'],
       targets: ['TikTok', 'Instagram', '达人主页', '历史合作记录'],
     }

@@ -9,10 +9,10 @@ const loginSeed = {
 }
 
 const quickPrompts = [
-  '帮我创建一个美国市场的健身达人首轮触达任务，目标 50 位，主平台 TikTok 和 Instagram，合作方式为寄样 + 佣金。',
-  '帮我整理一批适合筋膜枪冷启动的 Deal 站，输出邮箱、切入点和优先级。',
+  '帮我创建一个美国市场的创作者外联任务，目标 50 位，主平台 TikTok 和 Instagram，合作方式为寄样 + 佣金。',
+  '帮我整理一批适合新品冷启动的渠道站点，输出邮箱、切入点和优先级。',
   '帮我建立一个 YouTube 测评合作任务，优先 10 万粉以内、支持寄样的账号。',
-  '帮我整理一批健康类媒体 PR 名单，并生成第一轮沟通框架。',
+  '帮我整理一批健康类媒体合作名单，并生成第一轮沟通框架。',
 ]
 
 const navItems = [
@@ -130,7 +130,7 @@ function inferObjectType(text) {
   if (lowered.includes('deal')) return 'Deal 站'
   if (lowered.includes('pr') || lowered.includes('媒体')) return '媒体 / PR'
   if (lowered.includes('affiliate') || lowered.includes('联盟')) return '联盟客'
-  return '达人 / 创作者'
+  return '创作者 / 合作对象'
 }
 
 function inferPlatforms(text) {
@@ -174,11 +174,11 @@ function compactText(text, max = 24) {
 function deriveTaskTitle(text) {
   const content = String(text || '').trim()
   const market = inferMarket(content)
-  if (/deal/i.test(content)) return `${market} Deal 站搜集`
-  if (/youtube/i.test(content)) return `${market} YouTube 合作`
-  if (/pr|媒体/i.test(content)) return `${market} 媒体 PR 建联`
+  if (/deal/i.test(content)) return `${market} 渠道站点搜集`
+  if (/youtube/i.test(content)) return `${market} YouTube 外联`
+  if (/pr|媒体/i.test(content)) return `${market} 媒体合作`
   if (/affiliate|联盟/i.test(content)) return `${market} 联盟客拓展`
-  if (/达人|tiktok|instagram/i.test(content)) return `${market} 达人首轮触达`
+  if (/达人|tiktok|instagram/i.test(content)) return `${market} 创作者外联`
   return compactText(content, 18)
 }
 
@@ -196,7 +196,8 @@ function parseTaskSummary(task) {
   const instruction = String(task?.instruction || '')
   const objective = task?.structuredTask?.objective || instruction
   const fallbackTitle = deriveTaskTitle(objective.split('\n')[0] || objective)
-  const title = getLineValue(instruction, '任务名称') || fallbackTitle
+  const rawTitle = getLineValue(instruction, '任务名称')
+  const title = rawTitle && !/达人|红人|deal|首轮/i.test(rawTitle) ? rawTitle : fallbackTitle
   const product = getLineValue(instruction, '产品') || '未填写产品'
   const market = getLineValue(instruction, '市场') || inferMarket(objective)
   const platforms = getLineValue(instruction, '目标平台') || inferPlatforms(objective)
@@ -307,6 +308,24 @@ function normalizePackageContent(content) {
   return String(content || '')
     .replace('# 方洲AI红人增长执行方案', '# 方洲AI外联执行提示')
     .replace('执行方案', '执行提示')
+    .replace(/红人/g, '合作对象')
+    .replace(/达人范围/g, '对象范围')
+    .replace(/达人名称/g, '对象名称')
+}
+
+function normalizeLogMessage(message) {
+  return String(message || '')
+    .replace(/辅助BD/g, 'AI辅助处理')
+    .replace(/达人名单/g, '对象名单')
+    .replace(/达人/g, '对象')
+}
+
+function normalizeObjectiveText(text) {
+  return String(text || '')
+    .replace(/红人/g, '创作者')
+    .replace(/达人/g, '创作者')
+    .replace(/Deal 站/g, '渠道站点')
+    .replace(/媒体 PR/g, '媒体合作')
 }
 
 function App() {
@@ -845,7 +864,7 @@ function App() {
                 <span className="sub-note">像 ChatGPT 一样先输入目标，再把系统生成的执行提示交给外部 Agent。</span>
               </div>
 
-              <textarea className="hero-input" placeholder="例如：帮我创建一个美国市场的筋膜枪达人首轮触达任务，目标 50 位，优先 TikTok 和 Instagram，合作方式为寄样 + 佣金。" value={taskPrompt} onChange={(event) => setTaskPrompt(event.target.value)} />
+              <textarea className="hero-input" placeholder="例如：帮我创建一个美国市场的创作者外联任务，目标 50 位，优先 TikTok 和 Instagram，合作方式为寄样 + 佣金。" value={taskPrompt} onChange={(event) => setTaskPrompt(event.target.value)} />
 
               <div className="prompt-row">
                 {quickPrompts.map((item) => (
@@ -905,7 +924,7 @@ function App() {
 
                   <div className="thread-entry user">
                     <span className="thread-role">你刚刚说</span>
-                    <p>{activeTask.structuredTask?.objective || activeTask.instruction}</p>
+                    <p>{normalizeObjectiveText(activeTask.structuredTask?.objective || activeTask.instruction)}</p>
                   </div>
 
                   <div className="thread-entry assistant">
@@ -950,7 +969,7 @@ function App() {
                       {(activeTask.logs || []).map((log, index) => (
                         <div key={`${log.at}-${index}`} className="timeline-row">
                           <span>{shortDate(log.at)}</span>
-                          <p>{log.message}</p>
+                          <p>{normalizeLogMessage(log.message)}</p>
                         </div>
                       ))}
                     </div>
@@ -970,7 +989,7 @@ function App() {
           <section className="page-shell">
             <div className="panel-head">
               <div>
-                <p className="eyebrow">资产池</p>
+                <p className="eyebrow">资产</p>
                 <h3>把每次触达沉淀成品牌自己的合作资产</h3>
               </div>
               <input className="inline-search" placeholder="搜索名称、平台、状态" value={assetSearch} onChange={(event) => setAssetSearch(event.target.value)} />
