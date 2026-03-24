@@ -252,23 +252,23 @@ function channelState(config) {
   return [
     {
       name: config.opencloudName || 'OpenClaw Workspace',
-      status: config.opencloudUrl ? '已配置工作入口' : '未配置',
-      description: '这里填你的主执行入口，例如 OpenClaw、小龙虾或其他浏览器 Agent。',
+      status: config.opencloudUrl ? '已配置' : '未配置',
+      description: '这里放主 Agent 的网址。点“开始执行”时，会优先打开这里。',
     },
     {
       name: config.codexName || 'Codex / ChatGPT',
-      status: config.codexUrl ? '已配置工作入口' : '未配置',
-      description: '这里填第二执行入口，例如 Codex、ChatGPT 或备用工作区。',
+      status: config.codexUrl ? '已配置' : '未配置',
+      description: '这里放备用 Agent 的网址。主 Agent 不可用时可以切到这里。',
     },
     {
       name: 'Gmail',
-      status: config.gmailSender ? `已配置发件身份：${config.gmailSender}` : '未配置发件身份',
-      description: '用于从资产页直接跳转到写信窗口。',
+      status: config.gmailSender ? `发件身份：${config.gmailSender}` : '未配置发件身份',
+      description: '用于从案件页直接拉起邮件草稿。',
     },
     {
       name: 'WhatsApp',
-      status: config.whatsappNumber ? `已配置号码：${config.whatsappNumber}` : '未配置号码',
-      description: '用于从资产页直接打开对话入口。',
+      status: config.whatsappNumber ? `号码：${config.whatsappNumber}` : '未配置号码',
+      description: '用于从案件页直接拉起 WhatsApp 对话。',
     },
   ]
 }
@@ -279,13 +279,13 @@ function getProviderOptions(config) {
       id: 'opencloud',
       label: config.opencloudName || 'OpenClaw Workspace',
       url: config.opencloudUrl,
-      hint: '主工作区',
+      hint: '主 Agent',
     },
     {
       id: 'codex',
       label: config.codexName || 'Codex / ChatGPT',
       url: config.codexUrl,
-      hint: '备用工作区',
+      hint: '备用 Agent',
     },
   ]
 }
@@ -300,6 +300,7 @@ function sanitizePreferences(rawPreferences = {}) {
   if (merged.channelConfig.opencloudName === 'OpenCloud') merged.channelConfig.opencloudName = 'OpenClaw Workspace'
   if (merged.channelConfig.codexName === 'ChatGPT / CloudX') merged.channelConfig.codexName = 'Codex / ChatGPT'
   if (merged.channelConfig.opencloudUrl === 'https://app.opencloud.com') merged.channelConfig.opencloudUrl = ''
+  if (!merged.channelConfig.codexUrl) merged.channelConfig.codexUrl = defaultPreferences.channelConfig.codexUrl
   if (String(merged.brandProfile.productLinks || '').includes('example.com')) {
     merged.brandProfile.productLinks = defaultPreferences.brandProfile.productLinks
   }
@@ -648,7 +649,7 @@ function App() {
     if (!taskPrompt.trim() || !brandId) return
     if (!providerReady) {
       setCurrentPage('channels')
-      setWorkspaceMessage('先去执行入口页把工作区地址填好，再创建任务。')
+      setWorkspaceMessage('先去 Agent 连接页把地址填好，再创建任务。')
       return
     }
     setCreatingTask(true)
@@ -818,20 +819,28 @@ function App() {
   async function handleOpenWorkspace() {
     if (!providerReady) {
       setCurrentPage('channels')
-      setWorkspaceMessage('先去执行入口页把当前工作区地址填好。')
+      setWorkspaceMessage('先去 Agent 连接页把当前 Agent 地址填好。')
       return
     }
 
-    if (packageContent) {
-      await copyText(packageContent)
+    try {
+      if (activeTask && activeTask.status === '待执行') {
+        await apiFetch(`/api/tasks/${activeTask.id}/submit`, { method: 'POST' }, token)
+      }
+      if (packageContent) {
+        await copyText(packageContent)
+      }
+      openExternal(connectedProvider?.url)
+      await refreshWorkspace()
+      setWorkspaceMessage(`这条案件已标记为执行中，并已打开 ${connectedProvider?.label}。`)
+    } catch (error) {
+      setWorkspaceMessage(error.message)
     }
-    openExternal(connectedProvider?.url)
-      setWorkspaceMessage(`执行提示已复制，并已打开 ${connectedProvider?.label}。接下来直接在那个 Agent 里执行。`)
   }
 
   function openExternal(url) {
     if (!url) {
-      setWorkspaceMessage('当前工作区还没有配置地址。')
+      setWorkspaceMessage('当前 Agent 还没有配置地址。')
       setCurrentPage('channels')
       return
     }
@@ -871,7 +880,7 @@ function App() {
         <section className="login-copy-panel">
           <p className="eyebrow">External Ops</p>
           <h1>方洲AI</h1>
-          <p className="lead-copy">把目标、执行提示、回填结果和合作资产放在同一个工作区里，别再散在多个网页和聊天窗口。</p>
+          <p className="lead-copy">把目标、执行指令、回填结果和合作资产放在同一个系统里，别再散在多个网页和聊天窗口。</p>
           <div className="login-points">
             <div><strong>1.</strong><span>先用自然语言描述你的目标。</span></div>
             <div><strong>2.</strong><span>复制系统生成的执行提示，发给你常用的外部 Agent。</span></div>
@@ -1005,7 +1014,7 @@ function App() {
                   <p className="eyebrow">创建任务</p>
                   <h3>先把目标说清楚，系统会帮你整理成一条可执行线程</h3>
                 </div>
-                <span className="sub-note">像 ChatGPT 一样先输入目标，再把系统生成的执行提示交给外部 Agent。</span>
+                <span className="sub-note">像聊天一样先描述目标，再由系统帮你整理案件、推进对象和记录结果。</span>
               </div>
 
               <div className={providerReady ? 'connection-banner ready' : 'connection-banner'}>
@@ -1030,7 +1039,7 @@ function App() {
                 <div className="mini-card"><span>对象类型</span><strong>{taskDraft.objectType}</strong></div>
                 <div className="mini-card"><span>目标平台</span><strong>{taskDraft.platforms}</strong></div>
                 <div className="mini-card"><span>触达方式</span><strong>{taskDraft.channel}</strong></div>
-                <div className="mini-card"><span>目标量</span><strong>{taskDraft.goal}</strong></div>
+                <div className="mini-card"><span>计划联系人数</span><strong>{taskDraft.goal}</strong></div>
               </div>
 
               <div className="action-row">
@@ -1054,7 +1063,7 @@ function App() {
                     <div className="summary-chip"><span>市场</span><strong>{taskSummary.market}</strong></div>
                     <div className="summary-chip"><span>平台</span><strong>{taskSummary.platforms}</strong></div>
                     <div className="summary-chip"><span>触达</span><strong>{taskSummary.channel}</strong></div>
-                    <div className="summary-chip"><span>目标量</span><strong>{taskSummary.goal}</strong></div>
+                    <div className="summary-chip"><span>计划联系</span><strong>{taskSummary.goal}</strong></div>
                     <div className="summary-chip wide"><span>合作约束</span><strong>{taskSummary.constraints}</strong></div>
                   </div>
 
@@ -1076,18 +1085,18 @@ function App() {
                     </div>
 
                     <div className="thread-entry assistant">
-                      <span className="thread-role">执行提示</span>
-                      <p className="thread-copy">把下面这段提示交给你常用的工作区去执行，再把结果贴回这里。这个环节现在是诚实的手动桥接，不是假装自动化。</p>
+                      <span className="thread-role">发送给 Agent 的指令</span>
+                      <p className="thread-copy">点击“开始执行”后，系统会自动复制这段指令并打开你连接的 Agent。你不需要自己再整理一遍。</p>
                       <textarea className="package-box" value={packageContent} readOnly />
                       <div className="action-row wrap">
-                        <button type="button" className="secondary-button" onClick={() => copyText(packageContent).then(() => setWorkspaceMessage('执行提示已复制。'))}>复制执行提示</button>
-                        <button type="button" className="secondary-button" onClick={() => downloadText(activeTask.executionPackage?.exportName || 'task.txt', packageContent)}>下载 .txt</button>
-                        <button type="button" className="primary-button" onClick={handleOpenWorkspace} disabled={!providerReady}>复制给 Agent 并打开</button>
+                        <button type="button" className="primary-button" onClick={handleOpenWorkspace} disabled={!providerReady}>开始执行</button>
+                        <button type="button" className="secondary-button" onClick={() => copyText(packageContent).then(() => setWorkspaceMessage('执行指令已复制。'))}>只复制指令</button>
+                        <button type="button" className="secondary-button" onClick={() => downloadText(activeTask.executionPackage?.exportName || 'task.txt', packageContent)}>导出指令</button>
                         <button type="button" className="secondary-button" onClick={() => setCurrentPage('channels')}>Agent 连接</button>
                       </div>
                       <div className="manual-note">
                         <strong>当前版本不会骗你说“已经自动发出去了”。</strong>
-                        <p>这里负责整理任务、带上品牌记忆、接收结果。真正的执行动作仍然在你连接的工作区里完成。</p>
+                        <p>这里负责整理任务、带上品牌记忆、接收结果。真正的执行动作仍然在你连接的 Agent 里完成。</p>
                       </div>
                     </div>
 
@@ -1148,7 +1157,7 @@ function App() {
                                 <div className="wide"><span>下一步</span><strong>{normalizeDisplayText(activeLead.nextAction)}</strong></div>
                               </div>
                               <div className="action-row wrap">
-                                <button type="button" className="secondary-button" onClick={() => openProfile(activeLead)}>打开对象页</button>
+                                <button type="button" className="secondary-button" onClick={() => openProfile(activeLead)}>搜索对象资料</button>
                                 <button type="button" className="secondary-button" onClick={() => openGmail(activeLead)}>打开 Gmail 草稿</button>
                                 <button type="button" className="secondary-button" onClick={() => openWhatsApp(activeLead)}>打开 WhatsApp</button>
                               </div>
@@ -1333,7 +1342,7 @@ function App() {
                   <div className="wide"><span>下一步</span><strong>{normalizeDisplayText(activeLead.nextAction)}</strong></div>
                 </div>
                 <div className="action-row wrap">
-                  <button type="button" className="secondary-button" onClick={() => openProfile(activeLead)}>打开对象页</button>
+                  <button type="button" className="secondary-button" onClick={() => openProfile(activeLead)}>搜索对象资料</button>
                   <button type="button" className="secondary-button" onClick={() => openGmail(activeLead)}>用 Gmail 写信</button>
                   <button type="button" className="secondary-button" onClick={() => openWhatsApp(activeLead)}>打开 WhatsApp</button>
                 </div>
