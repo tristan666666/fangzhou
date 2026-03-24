@@ -11,10 +11,10 @@ const clientDistDir = path.join(rootDir, 'dist', 'client')
 const PORT = Number(process.env.PORT || 8787)
 
 const TASK_STATUS = {
-  packaged: '已生成交付包',
-  externalRunning: '执行中',
-  waitingRefill: '待回填结果',
-  completed: '已完成交付',
+  packaged: '待执行',
+  externalRunning: '外部执行中',
+  waitingRefill: '待贴回结果',
+  completed: '已回填',
 }
 
 const users = [
@@ -825,7 +825,7 @@ async function seedDemoData() {
 - 再补一轮英国市场的女性健身达人名单。`)
           appendLogs(task, ['首轮达人名单已完成回填。', '系统已生成本周优先推进建议。'])
         } else {
-          appendLogs(task, ['等待提交给外部执行 Agent。'])
+          appendLogs(task, ['等待发给外部 Agent 执行。'])
         }
 
         memoryTasks.push(task)
@@ -891,7 +891,7 @@ async function seedDemoData() {
 - 再补一轮英国市场的女性健身达人名单。`)
       appendLogs(task, ['首轮达人名单已完成回填。', '系统已生成本周优先推进建议。'])
     } else {
-      appendLogs(task, ['等待提交给外部执行 Agent。'])
+      appendLogs(task, ['等待发给外部 Agent 执行。'])
     }
 
     await saveTask(task)
@@ -1205,8 +1205,8 @@ app.post('/api/tasks/:id/submit', requireUser, async (req, res) => {
 
   task.status = TASK_STATUS.externalRunning
   task.submittedAt = nowIso()
-  task.executionPackage.externalStatus = '已提交给外部执行 Agent'
-  appendLogs(task, ['执行方案已提交，等待结果回填。'])
+  task.executionPackage.externalStatus = '已发给外部 Agent'
+  appendLogs(task, ['执行提示已发出，等待结果贴回。'])
 
   const savedTask = await saveTask(task)
   res.json({ task: publicTask(savedTask) })
@@ -1222,8 +1222,8 @@ app.post('/api/tasks/:id/mark-refill', requireUser, async (req, res) => {
   }
 
   task.status = TASK_STATUS.waitingRefill
-  task.executionPackage.externalStatus = '等待回填结果'
-  appendLogs(task, ['已进入待回填状态。'])
+  task.executionPackage.externalStatus = '等待贴回结果'
+  appendLogs(task, ['当前线程正在等待结果贴回。'])
 
   const savedTask = await saveTask(task)
   res.json({ task: publicTask(savedTask) })

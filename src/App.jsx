@@ -17,7 +17,7 @@ const quickPrompts = [
 
 const navItems = [
   { id: 'tasks', label: '任务' },
-  { id: 'assets', label: '资产池' },
+  { id: 'assets', label: '资产' },
   { id: 'conversations', label: '会话' },
   { id: 'brand', label: '品牌资料' },
   { id: 'channels', label: '通道' },
@@ -232,14 +232,14 @@ function buildTaskDraft(prompt) {
 function channelState(config) {
   return [
     {
-      name: '小龙虾 OpenCloud',
+      name: '执行通道 A',
       status: config.opencloudUrl ? '已配置工作入口' : '未配置',
-      description: '用于打开外部执行 Agent 页面并粘贴执行提示。',
+      description: '这里填你的主执行入口，例如 OpenCloud、小龙虾或其他浏览器 Agent。',
     },
     {
-      name: 'ChatGPT / CloudX',
+      name: '执行通道 B',
       status: config.codexUrl ? '已配置工作入口' : '未配置',
-      description: '作为第二执行通道，适合处理整理、总结和补充说明。',
+      description: '这里填第二执行入口，例如 ChatGPT、CloudX 或备用工作区。',
     },
     {
       name: 'Gmail',
@@ -254,8 +254,22 @@ function channelState(config) {
   ]
 }
 
+function displayTaskStatus(status) {
+  const mapping = {
+    '已生成交付包': '待执行',
+    '执行中': '外部执行中',
+    '待回填结果': '待贴回结果',
+    '已完成交付': '已回填',
+    '已提交给外部执行 Agent': '已发给外部 Agent',
+    '等待回填结果': '等待贴回结果',
+  }
+
+  return mapping[status] || status || '待执行'
+}
+
 function statusClass(status) {
-  if (status === '已确认合作' || String(status).includes('已完成')) return 'ok'
+  if (status === '已确认合作' || status === '已回填' || String(status).includes('已完成')) return 'ok'
+  if (status === '外部执行中' || status === '已发给外部 Agent') return 'hot'
   if (status === '待人工接管' || String(status).includes('待')) return 'warn'
   if (status === '洽谈中' || status === '已回复') return 'hot'
   return 'soft'
@@ -371,6 +385,8 @@ function App() {
   const taskDraft = useMemo(() => buildTaskDraft(taskPrompt), [taskPrompt])
   const taskSuggestions = useMemo(() => buildSuggestions(activeLead, preferences), [activeLead, preferences])
   const packageContent = useMemo(() => normalizePackageContent(activeTask?.executionPackage?.content || ''), [activeTask])
+  const currentPageLabel = useMemo(() => navItems.find((item) => item.id === currentPage)?.label || '任务', [currentPage])
+  const activeTaskStatus = displayTaskStatus(activeTask?.status)
 
   const taskCounts = useMemo(() => {
     const counts = Object.fromEntries(funnelOrder.map((item) => [item, 0]))
@@ -696,12 +712,12 @@ function App() {
     return (
       <div className="login-layout">
         <section className="login-copy-panel">
-          <p className="eyebrow">Private Workspace</p>
+          <p className="eyebrow">Agent Shell</p>
           <h1>方洲AI</h1>
-          <p className="lead-copy">把任务、执行结果、会话和资产放在同一个地方，不再散在多个网页里。</p>
+          <p className="lead-copy">把目标、执行提示、回填结果和合作资产放在同一个工作区里，别再散在多个网页和聊天窗口。</p>
           <div className="login-points">
             <div><strong>1.</strong><span>先用自然语言描述你的目标。</span></div>
-            <div><strong>2.</strong><span>复制系统生成的执行提示，发给小龙虾 OpenCloud 或 ChatGPT / CloudX。</span></div>
+            <div><strong>2.</strong><span>复制系统生成的执行提示，发给你常用的外部 Agent。</span></div>
             <div><strong>3.</strong><span>把执行结果贴回系统，沉淀成任务、会话和品牌资产。</span></div>
           </div>
         </section>
@@ -737,7 +753,7 @@ function App() {
           <div className="brand-mark">方</div>
           <div>
             <strong>方洲AI</strong>
-            <p>Workspace</p>
+            <p>Outreach Shell</p>
           </div>
         </div>
 
@@ -770,11 +786,12 @@ function App() {
           <div className="list-scroll">
             {filteredTasks.length ? filteredTasks.map((task) => {
               const summary = parseTaskSummary(task)
+              const taskStatus = displayTaskStatus(task.status)
               return (
                 <button key={task.id} type="button" className={currentTaskId === task.id ? 'task-chip active' : 'task-chip'} onClick={() => { setSelectedTaskId(task.id); setCurrentPage('tasks') }}>
                   <strong>{summary.title}</strong>
                   <span>{summary.market} · {summary.platforms}</span>
-                  <em className={`status-pill ${statusClass(task.status)}`}>{task.status}</em>
+                  <em className={`status-pill ${statusClass(taskStatus)}`}>{taskStatus}</em>
                 </button>
               )
             }) : <div className="empty-copy">还没有任务，先从上面的主输入框开始。</div>}
@@ -809,9 +826,9 @@ function App() {
             <h2>{activeBrand?.name || '未选择品牌'}</h2>
           </div>
           <div className="context-meta">
-            <span>对象：{taskSummary.objectType}</span>
-            <span>市场：{taskSummary.market}</span>
-            <span>平台：{taskSummary.platforms}</span>
+            <em className="status-pill soft">{currentPageLabel}</em>
+            <span>{tasks.length} 个任务</span>
+            <span>{currentLeads.length} 个对象</span>
           </div>
         </header>
 
@@ -823,9 +840,9 @@ function App() {
               <div className="panel-head">
                 <div>
                   <p className="eyebrow">创建任务</p>
-                  <h3>告诉方洲AI你要推进什么合作</h3>
+                  <h3>先把目标说清楚，系统会帮你整理成一条可执行线程</h3>
                 </div>
-                <span className="sub-note">输入目标后，下面会直接出现可复制的执行提示。</span>
+                <span className="sub-note">像 ChatGPT 一样先输入目标，再把系统生成的执行提示交给外部 Agent。</span>
               </div>
 
               <textarea className="hero-input" placeholder="例如：帮我创建一个美国市场的筋膜枪达人首轮触达任务，目标 50 位，优先 TikTok 和 Instagram，合作方式为寄样 + 佣金。" value={taskPrompt} onChange={(event) => setTaskPrompt(event.target.value)} />
@@ -853,21 +870,22 @@ function App() {
                 <section className="stack-panel">
                   <div className="panel-head">
                     <div>
-                      <p className="eyebrow">当前任务</p>
+                      <p className="eyebrow">当前线程</p>
                       <h3>{taskSummary.title}</h3>
                     </div>
-                    <em className={`status-pill ${statusClass(activeTask?.status)}`}>{activeTask?.status}</em>
+                    <em className={`status-pill ${statusClass(activeTaskStatus)}`}>{activeTaskStatus}</em>
                   </div>
 
-                  <div className="meta-grid">
-                    <div><span>产品</span><strong>{taskSummary.product}</strong></div>
-                    <div><span>市场</span><strong>{taskSummary.market}</strong></div>
-                    <div><span>平台</span><strong>{taskSummary.platforms}</strong></div>
-                    <div><span>触达方式</span><strong>{taskSummary.channel}</strong></div>
-                    <div className="wide"><span>合作约束</span><strong>{taskSummary.constraints}</strong></div>
+                  <div className="summary-strip">
+                    <div className="summary-chip"><span>对象</span><strong>{taskSummary.objectType}</strong></div>
+                    <div className="summary-chip"><span>市场</span><strong>{taskSummary.market}</strong></div>
+                    <div className="summary-chip"><span>平台</span><strong>{taskSummary.platforms}</strong></div>
+                    <div className="summary-chip"><span>触达</span><strong>{taskSummary.channel}</strong></div>
+                    <div className="summary-chip"><span>目标量</span><strong>{taskSummary.goal}</strong></div>
+                    <div className="summary-chip wide"><span>合作约束</span><strong>{taskSummary.constraints}</strong></div>
                   </div>
 
-                  <div className="funnel-strip">
+                  <div className="funnel-strip compact">
                     {funnelOrder.map((item) => (
                       <div key={item} className="funnel-item">
                         <span>{item}</span>
@@ -875,9 +893,59 @@ function App() {
                       </div>
                     ))}
                   </div>
+                </section>
 
-                  <div className="timeline-block">
-                    <div className="section-head"><strong>任务记录</strong></div>
+                <section className="stack-panel thread-panel">
+                  <div className="panel-head">
+                    <div>
+                      <p className="eyebrow">执行线程</p>
+                      <h3>把目标整理好，交给外部 Agent 跑，再把结果贴回这里</h3>
+                    </div>
+                  </div>
+
+                  <div className="thread-entry user">
+                    <span className="thread-role">你刚刚说</span>
+                    <p>{activeTask.structuredTask?.objective || activeTask.instruction}</p>
+                  </div>
+
+                  <div className="thread-entry assistant">
+                    <span className="thread-role">系统理解</span>
+                    <div className="thread-points">
+                      <p><strong>对象：</strong>{taskSummary.objectType}</p>
+                      <p><strong>平台：</strong>{taskSummary.platforms}</p>
+                      <p><strong>触达：</strong>{taskSummary.channel}</p>
+                      <p><strong>约束：</strong>{taskSummary.constraints}</p>
+                    </div>
+                  </div>
+
+                  <div className="thread-entry assistant">
+                    <span className="thread-role">执行提示</span>
+                    <p className="thread-copy">复制下面这段提示，发到你的外部 Agent 工作区。跑完后，把结构化结果贴回这里。</p>
+                    <textarea className="package-box" value={packageContent} readOnly />
+                    <div className="action-row wrap">
+                      <button type="button" className="secondary-button" onClick={() => copyText(packageContent).then(() => setWorkspaceMessage('执行提示已复制。'))}>复制执行提示</button>
+                      <button type="button" className="secondary-button" onClick={() => downloadText(activeTask.executionPackage?.exportName || 'task.txt', packageContent)}>下载 .txt</button>
+                      <button type="button" className="secondary-button" onClick={() => openExternal(preferences.channelConfig.opencloudUrl)}>打开执行通道 A</button>
+                      <button type="button" className="secondary-button" onClick={() => openExternal(preferences.channelConfig.codexUrl)}>打开执行通道 B</button>
+                      <button type="button" className="secondary-button" onClick={handleSubmitTask}>我已发给外部 Agent</button>
+                      <button type="button" className="secondary-button" onClick={handleMarkRefill}>等待贴回结果</button>
+                    </div>
+                  </div>
+
+                  <div className="thread-entry result">
+                    <span className="thread-role">结果贴回</span>
+                    <label className="field">
+                      <span>把外部 Agent 的结果粘贴到这里</span>
+                      <textarea className="refill-box" placeholder="把外部 Agent 跑完后的结果粘贴到这里。" value={refillDraft} onChange={(event) => setRefillDraft(event.target.value)} />
+                    </label>
+                    <div className="action-row">
+                      <button type="button" className="primary-button" onClick={handleRefill}>写入结果</button>
+                    </div>
+                    {activeTask.refill ? <div className="result-block"><strong>最近一次结果摘要</strong><p>{activeTask.refill.summary}</p></div> : null}
+                  </div>
+
+                  <div className="thread-entry system">
+                    <span className="thread-role">任务记录</span>
                     <div className="timeline-list">
                       {(activeTask.logs || []).map((log, index) => (
                         <div key={`${log.at}-${index}`} className="timeline-row">
@@ -887,43 +955,6 @@ function App() {
                       ))}
                     </div>
                   </div>
-                </section>
-
-                <section className="stack-panel">
-                  <div className="panel-head">
-                    <div>
-                      <p className="eyebrow">执行</p>
-                      <h3>复制提示，去外部 Agent 跑，再把结果贴回来</h3>
-                    </div>
-                  </div>
-
-                  <ol className="step-list">
-                    <li>复制下面这段执行提示。</li>
-                    <li>到小龙虾 OpenCloud 或 ChatGPT / CloudX 里粘贴运行。</li>
-                    <li>把结果贴回这里，系统会同步更新任务、会话和资产。</li>
-                  </ol>
-
-                  <textarea className="package-box" value={packageContent} readOnly />
-
-                  <div className="action-row wrap">
-                    <button type="button" className="secondary-button" onClick={() => copyText(packageContent).then(() => setWorkspaceMessage('执行提示已复制。'))}>复制执行提示</button>
-                    <button type="button" className="secondary-button" onClick={() => downloadText(activeTask.executionPackage?.exportName || 'task.txt', packageContent)}>下载 .txt</button>
-                    <button type="button" className="secondary-button" onClick={() => openExternal(preferences.channelConfig.opencloudUrl)}>打开小龙虾 OpenCloud</button>
-                    <button type="button" className="secondary-button" onClick={() => openExternal(preferences.channelConfig.codexUrl)}>打开 ChatGPT / CloudX</button>
-                    <button type="button" className="secondary-button" onClick={handleSubmitTask}>标记已发送</button>
-                    <button type="button" className="secondary-button" onClick={handleMarkRefill}>准备粘贴结果</button>
-                  </div>
-
-                  <label className="field">
-                    <span>结果回填</span>
-                    <textarea className="refill-box" placeholder="把外部 Agent 跑完后的结果粘贴到这里。" value={refillDraft} onChange={(event) => setRefillDraft(event.target.value)} />
-                  </label>
-
-                  <div className="action-row">
-                    <button type="button" className="primary-button" onClick={handleRefill}>写入结果</button>
-                  </div>
-
-                  {activeTask.refill ? <div className="result-block"><strong>最近一次结果摘要</strong><p>{activeTask.refill.summary}</p></div> : null}
                 </section>
               </div>
             ) : (
@@ -1138,7 +1169,7 @@ function App() {
             <div className="panel-head">
               <div>
                 <p className="eyebrow">通道</p>
-                <h3>这里只管入口，不假装替你跑平台私信</h3>
+                <h3>这里只配置入口，不假装替你打通所有平台私信</h3>
               </div>
             </div>
 
@@ -1154,11 +1185,11 @@ function App() {
 
             <div className="form-grid two">
               <label className="field">
-                <span>小龙虾 OpenCloud 地址</span>
+                <span>执行通道 A 地址</span>
                 <input value={preferences.channelConfig.opencloudUrl} onChange={(event) => setPreferences((current) => ({ ...current, channelConfig: { ...current.channelConfig, opencloudUrl: event.target.value } }))} />
               </label>
               <label className="field">
-                <span>ChatGPT / CloudX 地址</span>
+                <span>执行通道 B 地址</span>
                 <input value={preferences.channelConfig.codexUrl} onChange={(event) => setPreferences((current) => ({ ...current, channelConfig: { ...current.channelConfig, codexUrl: event.target.value } }))} />
               </label>
               <label className="field">

@@ -346,7 +346,7 @@
 
 .top-context {
   justify-content: space-between;
-  padding: 6px 2px;
+  padding: 2px 2px 6px;
 }
 
 .context-meta {
@@ -376,6 +376,69 @@
 .task-workspace {
   grid-template-columns: 1fr;
   gap: 14px;
+}
+
+.summary-strip,
+.thread-points {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.summary-chip {
+  border-radius: 14px;
+  border: 1px solid #e6e7eb;
+  background: #fafafa;
+  padding: 12px 14px;
+  display: grid;
+  gap: 4px;
+  min-width: 128px;
+}
+
+.summary-chip.wide {
+  min-width: min(100%, 360px);
+}
+
+.thread-panel {
+  gap: 12px;
+}
+
+.thread-entry {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid #e6e7eb;
+  background: #fbfbfc;
+}
+
+.thread-entry.user {
+  background: #f3f4f6;
+}
+
+.thread-entry.assistant {
+  background: #ffffff;
+}
+
+.thread-entry.result {
+  background: #f7fbf9;
+}
+
+.thread-entry.system {
+  background: #f9fafb;
+}
+
+.thread-role {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(22, 36, 28, 0.55);
+}
+
+.thread-copy {
+  margin: 0;
+  color: rgba(22, 36, 28, 0.72);
 }
 
 .panel-head {
@@ -409,6 +472,11 @@
   padding: 14px;
   display: grid;
   gap: 6px;
+}
+
+.funnel-strip.compact .funnel-item {
+  min-width: 108px;
+  padding: 12px;
 }
 
 .mini-card span,
@@ -487,7 +555,7 @@
 }
 
 .package-box {
-  min-height: 240px;
+  min-height: 220px;
 }
 
 .refill-box {
