@@ -540,6 +540,45 @@
   gap: 12px;
 }
 
+.lead-pile {
+  display: grid;
+  gap: 10px;
+}
+
+.lead-inline-card {
+  width: 100%;
+  border: 1px solid #e6e7eb;
+  border-radius: 16px;
+  background: #fafafa;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+}
+
+.lead-inline-card strong {
+  display: block;
+  color: #111827;
+}
+
+.lead-inline-card span {
+  font-size: 13px;
+  color: rgba(22, 36, 28, 0.62);
+}
+
+.lead-inline-card.active {
+  background: rgba(16, 163, 127, 0.08);
+  border-color: rgba(16, 163, 127, 0.24);
+}
+
+.inline-thread-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.2fr);
+  gap: 16px;
+}
+
 .snapshot-card {
   border-radius: 16px;
   border: 1px solid #e6e7eb;
@@ -791,6 +830,11 @@
   gap: 12px;
 }
 
+.message-list.compact {
+  min-height: 260px;
+  max-height: 360px;
+}
+
 .message-bubble {
   max-width: 78%;
   padding: 14px 16px;
@@ -818,6 +862,21 @@
 .composer-inline {
   display: grid;
   gap: 12px;
+}
+
+.mini-suggestion-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.suggestion-chip {
+  border: 1px solid #d8dbe2;
+  background: #f8fafc;
+  color: #0f172a;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 12px;
 }
 
 .form-shell {
@@ -963,6 +1022,10 @@
 
   .task-side-column {
     position: static;
+  }
+
+  .inline-thread-grid {
+    grid-template-columns: 1fr;
   }
 
   .list-scroll,

@@ -34,7 +34,7 @@ const demoBrands = [
   },
   {
     id: 'brand-demo-2',
-    name: 'North Star Beauty',
+    name: 'North Star Wellness',
     overview: '用于跨境外联推进的品牌空间，可管理任务、资产、会话和品牌记忆。',
   },
 ]
@@ -80,15 +80,15 @@ let bootstrapped = false
 function defaultPreferences() {
   return {
     brandProfile: {
-      intro: '我们是一套套在外部 Agent 之上的跨境外联业务壳层，负责统一记忆、任务编排、回填和资产沉淀。',
-      primaryProducts: '恢复类设备、居家健身配件、健康生活方式产品',
+      intro: 'North Star Wellness 是一个做居家恢复和热感护理产品的品牌，重点卖筋膜枪、热敷贴和 Recovery Wrap。',
+      primaryProducts: '筋膜枪 / 热敷贴 / Recovery Wrap',
       productLinks: 'https://northstarbeauty.com/products/recovery-wrap-pro\nhttps://northstarbeauty.com/products/heat-relief-patch',
-      quarterFocus: '本季度优先推动恢复类设备和礼品合作切口。',
-      pricingStrategy: '默认寄样 + 佣金，优先控制固定费用，必要时根据对象级别单独放宽。',
-      productPoints: '恢复类设备 / 居家健身 / 健康生活方式',
-      cooperationModes: '寄样 + 佣金，优先长期合作，默认不接受固定坑位费',
-      campaignProof: '首轮重点验证 TikTok / Instagram / YouTube / Deal 站的外联效率和回填闭环。',
-      faq: '是否支持寄样、佣金边界、物流周期、品牌卖点、竞品差异。',
+      quarterFocus: '本季度主推 Recovery Wrap 和热感贴，重点打母亲节礼品与恢复场景。',
+      pricingStrategy: '默认寄样 + CPS / CPA；固定费用需要单独审批。',
+      productPoints: '恢复速度快、居家场景强、送礼属性清晰、内容容易拍。',
+      cooperationModes: '寄样 + 佣金优先，必要时按对象级别单独谈固定费用。',
+      campaignProof: '已有创作者测评、newsletter 资源和 deal 站冷启动样例。',
+      faq: '品牌一句话介绍、价格带、寄样周期、佣金范围、是否接受独家。',
     },
     channelConfig: {
       provider: 'codex',

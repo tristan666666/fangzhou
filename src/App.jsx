@@ -16,12 +16,10 @@ const quickPrompts = [
 ]
 
 const navItems = [
-  { id: 'tasks', label: '任务推进' },
-  { id: 'assets', label: '品牌资产' },
-  { id: 'conversations', label: '沟通记录' },
+  { id: 'tasks', label: '案件对话' },
   { id: 'brand', label: '品牌记忆' },
-  { id: 'channels', label: '执行入口' },
-  { id: 'settings', label: '工作偏好' },
+  { id: 'channels', label: 'Agent 连接' },
+  { id: 'settings', label: '系统偏好' },
 ]
 
 const funnelOrder = ['已抓取', '初筛通过', '已触达', '已回复', '洽谈中', '已确认合作', '待人工接管']
@@ -672,7 +670,7 @@ function App() {
       setTaskPrompt('')
       await refreshWorkspace(brandId)
       setCurrentPage('tasks')
-      setWorkspaceMessage('新任务已创建。下一步直接复制提示并交给外部 Agent。')
+      setWorkspaceMessage('新案件已创建。下一步把提示交给你连接的 Agent 去执行。')
     } catch (error) {
       setWorkspaceMessage(error.message)
     } finally {
@@ -828,7 +826,7 @@ function App() {
       await copyText(packageContent)
     }
     openExternal(connectedProvider?.url)
-    setWorkspaceMessage(`执行提示已复制，并已打开 ${connectedProvider?.label}。`)
+      setWorkspaceMessage(`执行提示已复制，并已打开 ${connectedProvider?.label}。接下来直接在那个 Agent 里执行。`)
   }
 
   function openExternal(url) {
@@ -961,17 +959,17 @@ function App() {
         </section>
 
         <section className="sidebar-group">
-          <div className="section-head"><strong>最近会话</strong></div>
+          <div className="section-head"><strong>待处理对象</strong></div>
           <div className="list-scroll compact">
             {recentConversations.length ? recentConversations.map((lead) => (
-              <button key={lead.id} type="button" className={activeLead?.id === lead.id ? 'task-chip compact active' : 'task-chip compact'} onClick={() => { setSelectedTaskId(lead.taskId); setSelectedLeadId(lead.id); setCurrentPage('conversations') }}>
+              <button key={lead.id} type="button" className={activeLead?.id === lead.id ? 'task-chip compact active' : 'task-chip compact'} onClick={() => { setSelectedTaskId(lead.taskId); setSelectedLeadId(lead.id); setCurrentPage('tasks') }}>
                 <strong>{normalizeDisplayText(lead.name)}</strong>
                 <div className="task-chip-foot">
                   <span>{normalizeDisplayText(lead.platform)}</span>
                   <em className={`status-pill ${statusClass(lead.status)}`}>{normalizeDisplayText(lead.status)}</em>
                 </div>
               </button>
-            )) : <div className="empty-copy">当前任务还没有需要处理的会话。</div>}
+            )) : <div className="empty-copy">当前还没有需要处理的对象。</div>}
           </div>
         </section>
 
@@ -1012,11 +1010,11 @@ function App() {
 
               <div className={providerReady ? 'connection-banner ready' : 'connection-banner'}>
                 <div>
-                  <strong>{providerReady ? `当前执行工作区：${connectedProvider.label}` : '还没有设置执行工作区'}</strong>
-                  <p>{providerReady ? '创建任务后，系统会整理好执行提示。你只需要打开这个工作区，把提示发过去，再把结果贴回来。' : '先去“执行入口”页填好主工作区或备用工作区的地址。'}</p>
+                  <strong>{providerReady ? `当前已连接 Agent：${connectedProvider.label}` : '还没有连接 Agent'}</strong>
+                  <p>{providerReady ? '创建案件后，系统会整理好执行提示。你只需要打开这个 Agent，把提示发过去，再把结果贴回来。' : '先去“Agent 连接”页填好主 Agent 或备用 Agent 的地址。'}</p>
                 </div>
                 <button type="button" className="secondary-button" onClick={() => setCurrentPage('channels')}>
-                  {providerReady ? '执行入口设置' : '去设置入口'}
+                  {providerReady ? 'Agent 连接' : '去连接 Agent'}
                 </button>
               </div>
 
@@ -1084,8 +1082,8 @@ function App() {
                       <div className="action-row wrap">
                         <button type="button" className="secondary-button" onClick={() => copyText(packageContent).then(() => setWorkspaceMessage('执行提示已复制。'))}>复制执行提示</button>
                         <button type="button" className="secondary-button" onClick={() => downloadText(activeTask.executionPackage?.exportName || 'task.txt', packageContent)}>下载 .txt</button>
-                        <button type="button" className="primary-button" onClick={handleOpenWorkspace} disabled={!providerReady}>复制并打开工作区</button>
-                        <button type="button" className="secondary-button" onClick={() => setCurrentPage('channels')}>执行入口设置</button>
+                        <button type="button" className="primary-button" onClick={handleOpenWorkspace} disabled={!providerReady}>复制给 Agent 并打开</button>
+                        <button type="button" className="secondary-button" onClick={() => setCurrentPage('channels')}>Agent 连接</button>
                       </div>
                       <div className="manual-note">
                         <strong>当前版本不会骗你说“已经自动发出去了”。</strong>
@@ -1105,6 +1103,102 @@ function App() {
                       {activeTask.refill ? <div className="result-block"><strong>最近一次结果摘要</strong><p>{activeTask.refill.summary}</p></div> : null}
                     </div>
                   </div>
+
+                  <section className="stack-panel">
+                    <div className="panel-head">
+                      <div>
+                        <p className="eyebrow">当前对象</p>
+                        <h3>这个案件正在推进谁</h3>
+                      </div>
+                      <span className="sub-note">{currentLeads.length} 个对象</span>
+                    </div>
+
+                    {currentLeads.length ? (
+                      <>
+                        <div className="lead-pile">
+                          {currentLeads.map((lead) => (
+                            <button
+                              key={lead.id}
+                              type="button"
+                              className={activeLead?.id === lead.id ? 'lead-inline-card active' : 'lead-inline-card'}
+                              onClick={() => setSelectedLeadId(lead.id)}
+                            >
+                              <div>
+                                <strong>{normalizeDisplayText(lead.name)}</strong>
+                                <span>{normalizeDisplayText(lead.platform)} · {lead.followers}</span>
+                              </div>
+                              <em className={`status-pill ${statusClass(lead.status)}`}>{normalizeDisplayText(lead.status)}</em>
+                            </button>
+                          ))}
+                        </div>
+
+                        {activeLead ? (
+                          <div className="inline-thread-grid">
+                            <div className="stack-panel">
+                              <div className="panel-head">
+                                <div>
+                                  <p className="eyebrow">对象详情</p>
+                                  <h3>{normalizeDisplayText(activeLead.name)}</h3>
+                                </div>
+                                <em className={`status-pill ${statusClass(activeLead.status)}`}>{normalizeDisplayText(activeLead.status)}</em>
+                              </div>
+                              <div className="meta-grid">
+                                <div><span>平台</span><strong>{normalizeDisplayText(activeLead.platform)}</strong></div>
+                                <div><span>处理方式</span><strong>{normalizeDisplayText(activeLead.handling)}</strong></div>
+                                <div className="wide"><span>下一步</span><strong>{normalizeDisplayText(activeLead.nextAction)}</strong></div>
+                              </div>
+                              <div className="action-row wrap">
+                                <button type="button" className="secondary-button" onClick={() => openProfile(activeLead)}>打开对象页</button>
+                                <button type="button" className="secondary-button" onClick={() => openGmail(activeLead)}>打开 Gmail 草稿</button>
+                                <button type="button" className="secondary-button" onClick={() => openWhatsApp(activeLead)}>打开 WhatsApp</button>
+                              </div>
+                            </div>
+
+                            <div className="stack-panel">
+                              <div className="panel-head">
+                                <div>
+                                  <p className="eyebrow">沟通记录</p>
+                                  <h3>直接在这里处理回复</h3>
+                                </div>
+                              </div>
+
+                              <div className="message-list compact">
+                                {(activeLead.conversation || []).map((message) => (
+                                  <div key={message.id} className={`message-bubble ${message.role === 'creator' ? 'incoming' : 'outgoing'}`}>
+                                    <span>{message.role === 'creator' ? '对方' : message.role === 'agent' ? '我方' : '系统'}</span>
+                                    <p>{message.text}</p>
+                                  </div>
+                                ))}
+                              </div>
+
+                              <div className="composer-inline">
+                                <textarea placeholder="先在这里写回复，再决定是记到记录里，还是打开 Gmail / WhatsApp 去发。" value={replyDraft} onChange={(event) => setReplyDraft(event.target.value)} />
+                                <div className="action-row wrap">
+                                  <button type="button" className="primary-button" onClick={handleSendMessage}>写入沟通记录</button>
+                                  <button type="button" className="secondary-button" onClick={() => openGmail(activeLead, replyDraft)}>带着草稿打开 Gmail</button>
+                                  <button type="button" className="secondary-button" onClick={() => openWhatsApp(activeLead, replyDraft)}>带着草稿打开 WhatsApp</button>
+                                  <button type="button" className="secondary-button" onClick={() => handleLeadPatch({ status: '洽谈中' })}>标记洽谈中</button>
+                                  <button type="button" className="secondary-button" onClick={() => handleLeadPatch({ status: '待人工接管', handling: '人工接管' })}>标记待接管</button>
+                                </div>
+                                <div className="mini-suggestion-row">
+                                  {taskSuggestions.map((item) => (
+                                    <button key={item.title} type="button" className="suggestion-chip" onClick={() => setReplyDraft(item.body)}>
+                                      {item.title}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ) : null}
+                      </>
+                    ) : (
+                      <div className="empty-workspace compact">
+                        <strong>这条案件还没有生成对象</strong>
+                        <p>先把外部 Agent 的结果贴回上面，系统才会把对象和沟通记录沉淀到这里。</p>
+                      </div>
+                    )}
+                  </section>
                 </section>
 
                 <aside className="task-side-column">
@@ -1408,8 +1502,8 @@ function App() {
           <section className="form-shell">
             <div className="panel-head">
               <div>
-                <p className="eyebrow">执行入口</p>
-                <h3>先把常用工作区地址放在这里，再从任务页跳过去执行</h3>
+                <p className="eyebrow">Agent 连接</p>
+                <h3>把你常用的 Agent 地址放在这里，案件页会直接跳过去</h3>
               </div>
             </div>
 
@@ -1445,19 +1539,19 @@ function App() {
 
             <div className="form-grid two">
               <label className="field">
-                <span>主工作区名称</span>
+                <span>主 Agent 名称</span>
                 <input value={preferences.channelConfig.opencloudName} onChange={(event) => setPreferences((current) => ({ ...current, channelConfig: { ...current.channelConfig, opencloudName: event.target.value } }))} />
               </label>
               <label className="field">
-                <span>主工作区地址</span>
+                <span>主 Agent 地址</span>
                 <input value={preferences.channelConfig.opencloudUrl} onChange={(event) => setPreferences((current) => ({ ...current, channelConfig: { ...current.channelConfig, opencloudUrl: event.target.value } }))} />
               </label>
               <label className="field">
-                <span>备用工作区名称</span>
+                <span>备用 Agent 名称</span>
                 <input value={preferences.channelConfig.codexName} onChange={(event) => setPreferences((current) => ({ ...current, channelConfig: { ...current.channelConfig, codexName: event.target.value } }))} />
               </label>
               <label className="field">
-                <span>备用工作区地址</span>
+                <span>备用 Agent 地址</span>
                 <input value={preferences.channelConfig.codexUrl} onChange={(event) => setPreferences((current) => ({ ...current, channelConfig: { ...current.channelConfig, codexUrl: event.target.value } }))} />
               </label>
               <label className="field">
@@ -1474,7 +1568,7 @@ function App() {
               </label>
             </div>
 
-            <button className="primary-button" type="button" onClick={handleSavePreferences} disabled={savingPreferences}>{savingPreferences ? '保存中…' : '保存执行入口'}</button>
+            <button className="primary-button" type="button" onClick={handleSavePreferences} disabled={savingPreferences}>{savingPreferences ? '保存中…' : '保存 Agent 连接'}</button>
           </section>
         ) : null}
 
