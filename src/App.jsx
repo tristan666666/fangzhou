@@ -493,7 +493,7 @@ function App() {
       setTaskPrompt('')
       await refreshWorkspace(brandId)
       setCurrentPage('tasks')
-      setWorkspaceMessage('新任务已创建，下面可以直接复制给外部 Agent。')
+      setWorkspaceMessage('新任务已创建。下一步直接复制提示并交给外部 Agent。')
     } catch (error) {
       setWorkspaceMessage(error.message)
     } finally {
@@ -672,11 +672,9 @@ function App() {
     return (
       <div className="login-layout">
         <section className="login-copy-panel">
-          <p className="eyebrow">Outreach Operating Shell</p>
+          <p className="eyebrow">Private Workspace</p>
           <h1>方洲AI</h1>
-          <p className="lead-copy">
-            不是另一个 Agent，而是一层套在外部 Agent 上的外联业务壳层。它负责统一任务、统一记忆、统一结果回填和资产沉淀。
-          </p>
+          <p className="lead-copy">把任务、执行结果、会话和资产放在同一个地方，不再散在多个网页里。</p>
           <div className="login-points">
             <div><strong>1.</strong><span>先用自然语言描述你的目标。</span></div>
             <div><strong>2.</strong><span>复制系统生成的执行提示，发给小龙虾 OpenCloud 或 ChatGPT / CloudX。</span></div>
@@ -803,7 +801,7 @@ function App() {
                   <p className="eyebrow">创建任务</p>
                   <h3>告诉方洲AI你要推进什么合作</h3>
                 </div>
-                <span className="sub-note">系统会把自然语言整理成可复制给外部 Agent 的执行提示。</span>
+                <span className="sub-note">输入目标后，下面会直接出现可复制的执行提示。</span>
               </div>
 
               <textarea className="hero-input" placeholder="例如：帮我创建一个美国市场的筋膜枪达人首轮触达任务，目标 50 位，优先 TikTok 和 Instagram，合作方式为寄样 + 佣金。" value={taskPrompt} onChange={(event) => setTaskPrompt(event.target.value)} />
@@ -869,15 +867,15 @@ function App() {
               <section className="stack-panel">
                 <div className="panel-head">
                   <div>
-                    <p className="eyebrow">外部执行</p>
-                    <h3>先把执行提示交给 Agent，再把结果贴回来</h3>
+                    <p className="eyebrow">执行</p>
+                    <h3>复制提示，去外部 Agent 跑，再把结果贴回来</h3>
                   </div>
                 </div>
 
                 <ol className="step-list">
                   <li>复制下面这段执行提示。</li>
-                  <li>打开小龙虾 OpenCloud 或 ChatGPT / CloudX，直接粘贴运行。</li>
-                  <li>把结果贴回“结果回填”区域，系统会自动沉淀到任务和资产里。</li>
+                  <li>到小龙虾 OpenCloud 或 ChatGPT / CloudX 里粘贴运行。</li>
+                  <li>把结果贴回这里，系统会同步更新任务、会话和资产。</li>
                 </ol>
 
                 <textarea className="package-box" value={activeTask?.executionPackage?.content || ''} readOnly />
@@ -887,20 +885,20 @@ function App() {
                   <button type="button" className="secondary-button" onClick={() => downloadText(activeTask?.executionPackage?.exportName || 'task.txt', activeTask?.executionPackage?.content || '')}>下载 .txt</button>
                   <button type="button" className="secondary-button" onClick={() => openExternal(preferences.channelConfig.opencloudUrl)}>打开小龙虾 OpenCloud</button>
                   <button type="button" className="secondary-button" onClick={() => openExternal(preferences.channelConfig.codexUrl)}>打开 ChatGPT / CloudX</button>
-                  <button type="button" className="secondary-button" onClick={handleSubmitTask}>标记已发送给外部 Agent</button>
+                  <button type="button" className="secondary-button" onClick={handleSubmitTask}>标记已发送</button>
                   <button type="button" className="secondary-button" onClick={handleMarkRefill}>准备粘贴结果</button>
                 </div>
 
                 <label className="field">
                   <span>结果回填</span>
-                  <textarea className="refill-box" placeholder="把外部 Agent 跑完后的结果粘贴到这里。系统会自动整理摘要、证据和下一步动作。" value={refillDraft} onChange={(event) => setRefillDraft(event.target.value)} />
+                  <textarea className="refill-box" placeholder="把外部 Agent 跑完后的结果粘贴到这里。" value={refillDraft} onChange={(event) => setRefillDraft(event.target.value)} />
                 </label>
 
                 <div className="action-row">
                   <button type="button" className="primary-button" onClick={handleRefill}>写入结果</button>
                 </div>
 
-                {activeTask?.refill ? <div className="result-block"><strong>最近一次回填摘要</strong><p>{activeTask.refill.summary}</p></div> : null}
+                {activeTask?.refill ? <div className="result-block"><strong>最近一次结果摘要</strong><p>{activeTask.refill.summary}</p></div> : null}
               </section>
             </div>
           </section>
@@ -958,6 +956,28 @@ function App() {
                 </button>
               ))}
             </div>
+
+            {activeLead ? (
+              <div className="stack-panel">
+                <div className="panel-head">
+                  <div>
+                    <p className="eyebrow">当前对象</p>
+                    <h3>{activeLead.name}</h3>
+                  </div>
+                  <em className={`status-pill ${statusClass(activeLead.status)}`}>{activeLead.status}</em>
+                </div>
+                <div className="meta-grid">
+                  <div><span>平台</span><strong>{activeLead.platform}</strong></div>
+                  <div><span>处理方式</span><strong>{activeLead.handling}</strong></div>
+                  <div className="wide"><span>下一步</span><strong>{activeLead.nextAction}</strong></div>
+                </div>
+                <div className="action-row wrap">
+                  <button type="button" className="secondary-button" onClick={() => openProfile(activeLead)}>打开对象页</button>
+                  <button type="button" className="secondary-button" onClick={() => openGmail(activeLead)}>用 Gmail 写信</button>
+                  <button type="button" className="secondary-button" onClick={() => openWhatsApp(activeLead)}>打开 WhatsApp</button>
+                </div>
+              </div>
+            ) : null}
           </section>
         ) : null}
 
@@ -1004,6 +1024,30 @@ function App() {
                   <button type="button" className="secondary-button" onClick={() => handleLeadPatch({ status: '洽谈中' })}>标记洽谈中</button>
                 </div>
               </div>
+            </div>
+
+            <div className="assistant-shell">
+              <div className="panel-head">
+                <div>
+                  <p className="eyebrow">副驾驶</p>
+                  <h3>当前建议</h3>
+                </div>
+              </div>
+              <div className="suggestion-list">
+                {taskSuggestions.map((item) => (
+                  <button key={item.title} type="button" className="suggestion-card" onClick={() => setReplyDraft(item.body)}>
+                    <strong>{item.title}</strong>
+                    <p>{item.body}</p>
+                  </button>
+                ))}
+              </div>
+              {activeLead ? (
+                <div className="result-block">
+                  <strong>当前对象</strong>
+                  <p>{activeLead.name} · {activeLead.platform}</p>
+                  <p>{activeLead.nextAction}</p>
+                </div>
+              ) : null}
             </div>
           </section>
         ) : null}
@@ -1114,73 +1158,6 @@ function App() {
           </section>
         ) : null}
       </main>
-
-      <aside className="right-rail">
-        <div className="rail-card">
-          <div className="section-head"><strong>当前上下文</strong></div>
-          <div className="meta-grid narrow">
-            <div><span>任务</span><strong>{taskSummary.title}</strong></div>
-            <div><span>目标量</span><strong>{taskSummary.goal}</strong></div>
-            <div className="wide"><span>合作约束</span><strong>{taskSummary.constraints}</strong></div>
-          </div>
-        </div>
-
-        {currentPage === 'tasks' ? (
-          <div className="rail-card">
-            <div className="section-head"><strong>这个壳层真正解决的问题</strong></div>
-            <ul className="note-list">
-              <li>不是替代 OpenCloud / ChatGPT，而是把它们跑出来的结果统一沉淀回品牌系统。</li>
-              <li>一次任务可以留下执行记录、资产、会话和提醒，而不是散在多个网页里。</li>
-              <li>外部 Agent 只负责跑动作，方洲AI 负责记忆、回填和后续推进。</li>
-            </ul>
-          </div>
-        ) : null}
-
-        {currentPage === 'assets' && activeLead ? (
-          <div className="rail-card">
-            <div className="section-head"><strong>当前资产</strong></div>
-            <div className="meta-grid narrow">
-              <div><span>名称</span><strong>{activeLead.name}</strong></div>
-              <div><span>平台</span><strong>{activeLead.platform}</strong></div>
-              <div><span>当前状态</span><strong>{activeLead.status}</strong></div>
-              <div className="wide"><span>下一步</span><strong>{activeLead.nextAction}</strong></div>
-            </div>
-            <div className="action-column">
-              <button type="button" className="secondary-button" onClick={() => openProfile(activeLead)}>打开对象页</button>
-              <button type="button" className="secondary-button" onClick={() => openGmail(activeLead)}>用 Gmail 写信</button>
-              <button type="button" className="secondary-button" onClick={() => openWhatsApp(activeLead)}>打开 WhatsApp</button>
-            </div>
-          </div>
-        ) : null}
-
-        {currentPage === 'conversations' && activeLead ? (
-          <div className="rail-card">
-            <div className="section-head"><strong>AI 副驾驶</strong></div>
-            <div className="suggestion-list">
-              {taskSuggestions.map((item) => (
-                <button key={item.title} type="button" className="suggestion-card" onClick={() => setReplyDraft(item.body)}>
-                  <strong>{item.title}</strong>
-                  <p>{item.body}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        {dashboard.reminders?.length ? (
-          <div className="rail-card">
-            <div className="section-head"><strong>最近提醒</strong></div>
-            <div className="timeline-list">
-              {dashboard.reminders.slice(0, 4).map((item) => (
-                <button key={item.id} type="button" className="timeline-row action" onClick={() => { setSelectedTaskId(item.taskId); setSelectedLeadId(item.id); setCurrentPage('conversations') }}>
-                  <span>{shortDate(item.reminderAt)}</span>
-                  <p>{item.name} · {item.reminderNote || item.nextAction}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
-      </aside>
     </div>
   )
 }

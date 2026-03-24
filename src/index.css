@@ -2,11 +2,8 @@
   font-family: 'IBM Plex Sans', 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  color: #16241c;
-  background:
-    radial-gradient(circle at top left, rgba(94, 156, 122, 0.18), transparent 26%),
-    radial-gradient(circle at top right, rgba(201, 155, 88, 0.16), transparent 24%),
-    linear-gradient(180deg, #eee6d9 0%, #e7dece 100%);
+  color: #1f2328;
+  background: #f7f7f8;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -21,7 +18,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  color: #16241c;
+  color: #1f2328;
   background: inherit;
 }
 
@@ -49,7 +46,7 @@ button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid #4e9876;
+  outline: 2px solid #10a37f;
   outline-offset: 2px;
 }
 
