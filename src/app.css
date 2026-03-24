@@ -264,7 +264,7 @@
 
 .shell-layout {
   min-height: 100vh;
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-columns: 280px minmax(0, 1fr);
   gap: 16px;
   padding: 16px;
 }
@@ -283,10 +283,10 @@
 }
 
 .sidebar-group {
-  padding: 10px;
+  padding: 12px;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .brand-mark {
@@ -316,33 +316,45 @@
   min-height: 0;
   overflow: auto;
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .list-scroll.compact {
-  max-height: 220px;
+  max-height: 240px;
 }
 
 .task-chip,
 .conversation-chip {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.09);
   color: #edf3ef;
   padding: 12px;
   text-align: left;
   display: grid;
-  gap: 5px;
+  gap: 8px;
 }
 
 .task-chip span,
 .conversation-chip span,
 .empty-copy {
   font-size: 13px;
-  color: rgba(237, 243, 239, 0.78);
+  color: rgba(237, 243, 239, 0.84);
 }
 
 .task-chip em {
   justify-self: start;
+}
+
+.task-chip-meta {
+  font-size: 12px;
+  color: rgba(237, 243, 239, 0.72);
+}
+
+.task-chip-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .main-shell {
@@ -409,8 +421,20 @@
 }
 
 .task-workspace {
-  grid-template-columns: 1fr;
-  gap: 14px;
+  grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.9fr);
+  gap: 16px;
+}
+
+.task-main-column,
+.task-side-column {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.task-side-column {
+  position: sticky;
+  top: 16px;
 }
 
 .summary-strip,
@@ -432,10 +456,6 @@
 
 .summary-chip.wide {
   min-width: min(100%, 360px);
-}
-
-.thread-panel {
-  gap: 12px;
 }
 
 .thread-entry {
@@ -461,6 +481,11 @@
 
 .thread-entry.system {
   background: #f9fafb;
+}
+
+.thread-stream {
+  display: grid;
+  gap: 12px;
 }
 
 .thread-role {
@@ -492,6 +517,33 @@
   text-align: left;
 }
 
+.snapshot-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.snapshot-card {
+  border-radius: 16px;
+  border: 1px solid #e6e7eb;
+  background: #fafafa;
+  padding: 14px;
+  display: grid;
+  gap: 6px;
+}
+
+.snapshot-card span {
+  font-size: 12px;
+  color: rgba(22, 36, 28, 0.58);
+}
+
+.snapshot-card p {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(22, 36, 28, 0.68);
+  line-height: 1.5;
+}
+
 .provider-card.active {
   background: rgba(16, 163, 127, 0.1);
   border-color: rgba(16, 163, 127, 0.24);
@@ -508,7 +560,6 @@
 }
 
 .prompt-row,
-.funnel-strip,
 .action-row.wrap {
   display: flex;
   flex-wrap: wrap;
@@ -525,8 +576,7 @@
   gap: 12px;
 }
 
-.mini-card,
-.funnel-item {
+.mini-card {
   border-radius: 16px;
   border: 1px solid #e6e7eb;
   background: #fbfbfc;
@@ -535,13 +585,7 @@
   gap: 6px;
 }
 
-.funnel-strip.compact .funnel-item {
-  min-width: 108px;
-  padding: 12px;
-}
-
 .mini-card span,
-.funnel-item span,
 .meta-grid span {
   font-size: 12px;
   color: rgba(22, 36, 28, 0.6);
@@ -564,6 +608,30 @@
 .result-block {
   display: grid;
   gap: 10px;
+}
+
+.activity-list {
+  display: grid;
+  gap: 10px;
+}
+
+.activity-row {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid #eceef2;
+  background: #fafafa;
+}
+
+.activity-row span {
+  font-size: 12px;
+  color: rgba(22, 36, 28, 0.56);
+}
+
+.activity-row p {
+  margin: 0;
+  color: rgba(22, 36, 28, 0.78);
 }
 
 .timeline-row {
@@ -621,6 +689,21 @@
 
 .refill-box {
   min-height: 160px;
+}
+
+.manual-note {
+  display: grid;
+  gap: 6px;
+  border-radius: 14px;
+  border: 1px solid rgba(239, 179, 63, 0.22);
+  background: rgba(239, 179, 63, 0.12);
+  padding: 14px;
+}
+
+.manual-note p {
+  margin: 0;
+  color: rgba(22, 36, 28, 0.78);
+  line-height: 1.6;
 }
 
 .table-shell {
@@ -821,7 +904,7 @@
 
 @media (max-width: 1280px) {
   .shell-layout {
-    grid-template-columns: 260px minmax(0, 1fr);
+    grid-template-columns: 272px minmax(0, 1fr);
   }
 }
 
@@ -834,6 +917,7 @@
   .channel-grid,
   .draft-grid,
   .memory-grid,
+  .snapshot-grid,
   .provider-picker,
   .connection-banner {
     grid-template-columns: 1fr;
@@ -842,6 +926,10 @@
   .sidebar-shell {
     position: static;
     height: auto;
+  }
+
+  .task-side-column {
+    position: static;
   }
 
   .table-head {

@@ -9,10 +9,10 @@ const loginSeed = {
 }
 
 const quickPrompts = [
-  '帮我创建一个美国市场的创作者外联任务，目标 50 位，主平台 TikTok 和 Instagram，合作方式为寄样 + 佣金。',
-  '帮我整理一批适合新品冷启动的渠道站点，输出邮箱、切入点和优先级。',
-  '帮我建立一个 YouTube 测评合作任务，优先 10 万粉以内、支持寄样的账号。',
-  '帮我整理一批健康类媒体合作名单，并生成第一轮沟通框架。',
+  '帮我创建一个美国市场的春季外联任务，目标对象包含测评频道、渠道站点和 affiliate partner。',
+  '帮我整理一批适合新品冷启动的渠道站点，输出联系人、切入点和优先级。',
+  '帮我建立一个 YouTube 测评合作任务，优先支持寄样和 CPS 的账号。',
+  '帮我整理一批 wellness 媒体合作名单，并生成第一轮沟通框架。',
 ]
 
 const navItems = [
@@ -67,10 +67,10 @@ const defaultPreferences = {
     faq: '',
   },
   channelConfig: {
-    provider: 'opencloud',
-    opencloudName: 'OpenCloud',
-    opencloudUrl: 'https://app.opencloud.com',
-    codexName: 'ChatGPT / CloudX',
+    provider: 'codex',
+    opencloudName: 'OpenClaw Workspace',
+    opencloudUrl: '',
+    codexName: 'Codex / ChatGPT',
     codexUrl: 'https://chatgpt.com',
     gmailSender: '',
     gmailSignature: 'Best regards,\nFangzhou AI',
@@ -213,11 +213,11 @@ function parseTaskSummary(task) {
   const goal = getLineValue(instruction, '目标触达') || inferGoal(objective)
 
   return {
-    title,
+    title: normalizeDisplayText(title),
     product,
     market,
-    objectType: inferObjectType(objective),
-    platforms,
+    objectType: normalizeDisplayText(inferObjectType(objective)),
+    platforms: normalizeDisplayText(platforms),
     channel,
     constraints,
     goal,
@@ -240,14 +240,14 @@ function buildTaskDraft(prompt) {
 function channelState(config) {
   return [
     {
-      name: config.opencloudName || 'OpenCloud',
+      name: config.opencloudName || 'OpenClaw Workspace',
       status: config.opencloudUrl ? '已配置工作入口' : '未配置',
-      description: '这里填你的主执行入口，例如 OpenCloud、小龙虾或其他浏览器 Agent。',
+      description: '这里填你的主执行入口，例如 OpenClaw、小龙虾或其他浏览器 Agent。',
     },
     {
-      name: config.codexName || 'ChatGPT / CloudX',
+      name: config.codexName || 'Codex / ChatGPT',
       status: config.codexUrl ? '已配置工作入口' : '未配置',
-      description: '这里填第二执行入口，例如 ChatGPT、CloudX 或备用工作区。',
+      description: '这里填第二执行入口，例如 Codex、ChatGPT 或备用工作区。',
     },
     {
       name: 'Gmail',
@@ -266,17 +266,38 @@ function getProviderOptions(config) {
   return [
     {
       id: 'opencloud',
-      label: config.opencloudName || 'OpenCloud',
+      label: config.opencloudName || 'OpenClaw Workspace',
       url: config.opencloudUrl,
       hint: '主执行入口',
     },
     {
       id: 'codex',
-      label: config.codexName || 'ChatGPT / CloudX',
+      label: config.codexName || 'Codex / ChatGPT',
       url: config.codexUrl,
       hint: '备用执行入口',
     },
   ]
+}
+
+function sanitizePreferences(rawPreferences = {}) {
+  const merged = {
+    brandProfile: { ...defaultPreferences.brandProfile, ...(rawPreferences.brandProfile || {}) },
+    channelConfig: { ...defaultPreferences.channelConfig, ...(rawPreferences.channelConfig || {}) },
+    settings: { ...defaultPreferences.settings, ...(rawPreferences.settings || {}) },
+  }
+
+  if (merged.channelConfig.opencloudName === 'OpenCloud') merged.channelConfig.opencloudName = 'OpenClaw Workspace'
+  if (merged.channelConfig.codexName === 'ChatGPT / CloudX') merged.channelConfig.codexName = 'Codex / ChatGPT'
+  if (merged.channelConfig.opencloudUrl === 'https://app.opencloud.com') merged.channelConfig.opencloudUrl = ''
+  if (String(merged.brandProfile.productLinks || '').includes('example.com')) {
+    merged.brandProfile.productLinks = defaultPreferences.brandProfile.productLinks
+  }
+
+  if (!merged.channelConfig.opencloudUrl && merged.channelConfig.codexUrl) {
+    merged.channelConfig.provider = merged.channelConfig.provider === 'opencloud' ? 'codex' : merged.channelConfig.provider
+  }
+
+  return merged
 }
 
 function buildMemoryDigest(profile) {
@@ -347,18 +368,26 @@ function normalizePackageContent(content) {
 }
 
 function normalizeLogMessage(message) {
-  return String(message || '')
-    .replace(/辅助BD/g, 'AI辅助处理')
-    .replace(/达人名单/g, '对象名单')
-    .replace(/达人/g, '对象')
+  return normalizeDisplayText(message)
 }
 
 function normalizeObjectiveText(text) {
+  return normalizeDisplayText(text)
+}
+
+function normalizeDisplayText(text) {
   return String(text || '')
     .replace(/红人/g, '创作者')
     .replace(/达人/g, '创作者')
     .replace(/Deal 站/g, '渠道站点')
+    .replace(/Deal站/g, '渠道站点')
+    .replace(/媒体\s*\/\s*PR/g, '媒体合作')
     .replace(/媒体 PR/g, '媒体合作')
+    .replace(/辅助BD/g, 'AI辅助处理')
+    .replace(/人工BD/g, '人工接管')
+    .replace(/自动BD/g, '自动触达')
+    .replace(/对象池/g, '资产')
+    .replace(/达人名单/g, '对象名单')
 }
 
 function App() {
@@ -444,12 +473,35 @@ function App() {
   const providerReady = Boolean(connectedProvider?.url)
   const memoryDigest = useMemo(() => buildMemoryDigest(preferences.brandProfile), [preferences.brandProfile])
 
-  const taskCounts = useMemo(() => {
-    const counts = Object.fromEntries(funnelOrder.map((item) => [item, 0]))
-    for (const lead of currentLeads) {
-      if (counts[lead.status] !== undefined) counts[lead.status] += 1
-    }
-    return counts
+  const taskSnapshot = useMemo(() => {
+    const waitingForYou = currentLeads.filter((lead) => ['待人工接管', '已回复', '洽谈中'].includes(lead.status)).length
+    const activeReplies = currentLeads.filter((lead) => ['已触达', '已回复', '洽谈中'].includes(lead.status)).length
+    const nextReminder = [...currentLeads]
+      .filter((lead) => lead.reminderAt)
+      .sort((left, right) => String(left.reminderAt).localeCompare(String(right.reminderAt)))[0]
+
+    return [
+      {
+        label: '当前状态',
+        value: activeTaskStatus,
+        note: activeTask?.refill ? '最新一轮结果已贴回系统' : '这条线程还在持续推进',
+      },
+      {
+        label: '已沉淀对象',
+        value: `${currentLeads.length}`,
+        note: activeReplies ? `${activeReplies} 条已进入沟通` : '还没有进入沟通的对象',
+      },
+      {
+        label: '待你处理',
+        value: `${waitingForYou}`,
+        note: waitingForYou ? '存在需要人工判断或跟进的对象' : '当前没有卡在人工处理的对象',
+      },
+      {
+        label: '最近提醒',
+        value: nextReminder ? shortDate(nextReminder.reminderAt) : '暂无',
+        note: nextReminder ? `${nextReminder.name} · ${nextReminder.reminderNote || nextReminder.nextAction}` : '这条线程还没有设置提醒',
+      },
+    ]
   }, [currentLeads])
 
   const recentConversations = useMemo(() => {
@@ -496,7 +548,11 @@ function App() {
         if (cancelled) return
         setUser(data.user)
         setBrands(data.brands || [])
-        setBrandId((current) => current || data.brands?.[0]?.id || '')
+        setBrandId((current) => {
+          if (current) return current
+          const polishedDefault = data.brands?.find((brand) => brand.id === 'brand-demo-2')
+          return polishedDefault?.id || data.brands?.[0]?.id || ''
+        })
       } catch {
         localStorage.removeItem(TOKEN_KEY)
         if (cancelled) return
@@ -526,11 +582,7 @@ function App() {
         apiFetch(`/api/preferences?brandId=${targetBrandId}`, {}, token),
       ])
       setDashboard(dash)
-      setPreferences({
-        brandProfile: { ...defaultPreferences.brandProfile, ...(prefs.brandProfile || {}) },
-        channelConfig: { ...defaultPreferences.channelConfig, ...(prefs.channelConfig || {}) },
-        settings: { ...defaultPreferences.settings, ...(prefs.settings || {}) },
-      })
+      setPreferences(sanitizePreferences(prefs))
       setSelectedTaskId((current) => current || dash.activeTaskId || dash.tasks?.[0]?.id || '')
       setSelectedLeadId('')
       setSelectedLeadIds([])
@@ -855,8 +907,11 @@ function App() {
               return (
                 <button key={task.id} type="button" className={currentTaskId === task.id ? 'task-chip active' : 'task-chip'} onClick={() => { setSelectedTaskId(task.id); setCurrentPage('tasks') }}>
                   <strong>{summary.title}</strong>
-                  <span>{summary.market} · {summary.platforms}</span>
-                  <em className={`status-pill ${statusClass(taskStatus)}`}>{taskStatus}</em>
+                  <span className="task-chip-meta">{summary.product} · {summary.market}</span>
+                  <div className="task-chip-foot">
+                    <span>{summary.platforms}</span>
+                    <em className={`status-pill ${statusClass(taskStatus)}`}>{taskStatus}</em>
+                  </div>
                 </button>
               )
             }) : <div className="empty-copy">还没有任务，先从上面的主输入框开始。</div>}
@@ -868,8 +923,11 @@ function App() {
           <div className="list-scroll compact">
             {recentConversations.length ? recentConversations.map((lead) => (
               <button key={lead.id} type="button" className={activeLead?.id === lead.id ? 'task-chip compact active' : 'task-chip compact'} onClick={() => { setSelectedTaskId(lead.taskId); setSelectedLeadId(lead.id); setCurrentPage('conversations') }}>
-                <strong>{lead.name}</strong>
-                <span>{lead.platform} · {lead.status}</span>
+                <strong>{normalizeDisplayText(lead.name)}</strong>
+                <div className="task-chip-foot">
+                  <span>{normalizeDisplayText(lead.platform)}</span>
+                  <em className={`status-pill ${statusClass(lead.status)}`}>{normalizeDisplayText(lead.status)}</em>
+                </div>
               </button>
             )) : <div className="empty-copy">当前任务还没有需要处理的会话。</div>}
           </div>
@@ -893,7 +951,7 @@ function App() {
           <div className="context-meta">
             <em className="status-pill soft">{currentPageLabel}</em>
             <span>{tasks.length} 个任务</span>
-            <span>{currentLeads.length} 个对象</span>
+            <span>{activeTask ? taskSummary.title : '等待选择任务'}</span>
           </div>
         </header>
 
@@ -920,7 +978,7 @@ function App() {
                 </button>
               </div>
 
-              <textarea className="hero-input" placeholder="例如：帮我创建一个美国市场的创作者外联任务，目标 50 位，优先 TikTok 和 Instagram，合作方式为寄样 + 佣金。" value={taskPrompt} onChange={(event) => setTaskPrompt(event.target.value)} />
+              <textarea className="hero-input" placeholder="例如：帮我创建一个美国市场的春季外联任务，目标对象包含测评频道、渠道站点和 affiliate partner。" value={taskPrompt} onChange={(event) => setTaskPrompt(event.target.value)} />
 
               <div className="prompt-row">
                 {quickPrompts.map((item) => (
@@ -942,7 +1000,7 @@ function App() {
 
             {activeTask ? (
               <div className="task-workspace">
-                <section className="stack-panel">
+                <section className="stack-panel task-main-column">
                   <div className="panel-head">
                     <div>
                       <p className="eyebrow">当前线程</p>
@@ -960,19 +1018,74 @@ function App() {
                     <div className="summary-chip wide"><span>合作约束</span><strong>{taskSummary.constraints}</strong></div>
                   </div>
 
-                  <div className="funnel-strip compact">
-                    {funnelOrder.map((item) => (
-                      <div key={item} className="funnel-item">
-                        <span>{item}</span>
-                        <strong>{taskCounts[item] || 0}</strong>
-                      </div>
-                    ))}
-                  </div>
+                  <div className="thread-stream">
+                    <div className="thread-entry user">
+                      <span className="thread-role">任务目标</span>
+                      <p>{normalizeObjectiveText(activeTask.structuredTask?.objective || activeTask.instruction)}</p>
+                    </div>
 
-                  <div className="memory-panel">
+                    <div className="thread-entry assistant">
+                      <span className="thread-role">系统理解</span>
+                      <div className="thread-points">
+                        <p><strong>对象：</strong>{taskSummary.objectType}</p>
+                        <p><strong>平台：</strong>{taskSummary.platforms}</p>
+                        <p><strong>触达：</strong>{taskSummary.channel}</p>
+                        <p><strong>约束：</strong>{taskSummary.constraints}</p>
+                      </div>
+                      <p className="thread-copy">系统不会替你假装已经接通外部执行器。当前只负责把任务整理清楚、把品牌记忆带进去，并把后续结果沉淀回来。</p>
+                    </div>
+
+                    <div className="thread-entry assistant">
+                      <span className="thread-role">执行提示</span>
+                      <p className="thread-copy">复制下面这段提示，手动发到你已连接的执行提供方工作区，再把结果贴回这里。</p>
+                      <textarea className="package-box" value={packageContent} readOnly />
+                      <div className="action-row wrap">
+                        <button type="button" className="secondary-button" onClick={() => copyText(packageContent).then(() => setWorkspaceMessage('执行提示已复制。'))}>复制执行提示</button>
+                        <button type="button" className="secondary-button" onClick={() => downloadText(activeTask.executionPackage?.exportName || 'task.txt', packageContent)}>下载 .txt</button>
+                        <button type="button" className="secondary-button" onClick={() => openExternal(connectedProvider?.url)} disabled={!providerReady}>打开 {connectedProvider?.label || '执行提供方'}</button>
+                        <button type="button" className="secondary-button" onClick={() => setCurrentPage('channels')}>管理提供方</button>
+                      </div>
+                      <div className="manual-note">
+                        <strong>当前版本是真实的手动桥接，不是假装自动化。</strong>
+                        <p>也就是说：这里负责生成提示、保留上下文、接收结果。真正的浏览器操作仍然在外部 Agent 那边完成，当前还没有自动派发和自动回流。</p>
+                      </div>
+                    </div>
+
+                    <div className="thread-entry result">
+                      <span className="thread-role">结果贴回</span>
+                      <label className="field">
+                        <span>把外部 Agent 的结果粘贴到这里</span>
+                        <textarea className="refill-box" placeholder="把外部 Agent 跑完后的结果粘贴到这里。" value={refillDraft} onChange={(event) => setRefillDraft(event.target.value)} />
+                      </label>
+                      <div className="action-row">
+                        <button type="button" className="primary-button" onClick={handleRefill}>写入结果</button>
+                      </div>
+                      {activeTask.refill ? <div className="result-block"><strong>最近一次结果摘要</strong><p>{activeTask.refill.summary}</p></div> : null}
+                    </div>
+                  </div>
+                </section>
+
+                <aside className="task-side-column">
+                  <section className="stack-panel">
+                    <div className="section-head">
+                      <strong>当前快照</strong>
+                      <span>{activeBrand?.name || '当前品牌'}</span>
+                    </div>
+                    <div className="snapshot-grid">
+                      {taskSnapshot.map((item) => (
+                        <div key={item.label} className="snapshot-card">
+                          <span>{item.label}</span>
+                          <strong>{item.value}</strong>
+                          <p>{item.note}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="stack-panel memory-panel">
                     <div className="section-head">
                       <strong>品牌记忆</strong>
-                      <span>{activeBrand?.name || '当前品牌'}</span>
+                      <span>这部分会进入任务上下文</span>
                     </div>
                     <div className="memory-grid">
                       {memoryDigest.map((item) => (
@@ -982,70 +1095,23 @@ function App() {
                         </div>
                       ))}
                     </div>
-                  </div>
-                </section>
+                  </section>
 
-                <section className="stack-panel thread-panel">
-                  <div className="panel-head">
-                    <div>
-                      <p className="eyebrow">执行线程</p>
-                      <h3>把目标整理好，交给外部 Agent 跑，再把结果贴回这里</h3>
+                  <section className="stack-panel">
+                    <div className="section-head">
+                      <strong>最近更新</strong>
+                      <span>{(activeTask.logs || []).length} 条记录</span>
                     </div>
-                  </div>
-
-                  <div className="thread-entry user">
-                    <span className="thread-role">你刚刚说</span>
-                    <p>{normalizeObjectiveText(activeTask.structuredTask?.objective || activeTask.instruction)}</p>
-                  </div>
-
-                  <div className="thread-entry assistant">
-                    <span className="thread-role">系统理解</span>
-                    <div className="thread-points">
-                      <p><strong>对象：</strong>{taskSummary.objectType}</p>
-                      <p><strong>平台：</strong>{taskSummary.platforms}</p>
-                      <p><strong>触达：</strong>{taskSummary.channel}</p>
-                      <p><strong>约束：</strong>{taskSummary.constraints}</p>
-                    </div>
-                  </div>
-
-                  <div className="thread-entry assistant">
-                    <span className="thread-role">执行提示</span>
-                    <p className="thread-copy">复制下面这段提示，发到你的外部 Agent 工作区。跑完后，把结构化结果贴回这里。</p>
-                    <textarea className="package-box" value={packageContent} readOnly />
-                    <div className="action-row wrap">
-                      <button type="button" className="secondary-button" onClick={() => copyText(packageContent).then(() => setWorkspaceMessage('执行提示已复制。'))}>复制执行提示</button>
-                      <button type="button" className="secondary-button" onClick={() => downloadText(activeTask.executionPackage?.exportName || 'task.txt', packageContent)}>下载 .txt</button>
-                      <button type="button" className="secondary-button" onClick={() => openExternal(connectedProvider?.url)} disabled={!providerReady}>打开已连接提供方</button>
-                      <button type="button" className="secondary-button" onClick={() => setCurrentPage('channels')}>切换执行提供方</button>
-                      <button type="button" className="secondary-button" onClick={handleSubmitTask} disabled={!providerReady}>我已发给外部 Agent</button>
-                      <button type="button" className="secondary-button" onClick={handleMarkRefill} disabled={!providerReady}>等待贴回结果</button>
-                    </div>
-                  </div>
-
-                  <div className="thread-entry result">
-                    <span className="thread-role">结果贴回</span>
-                    <label className="field">
-                      <span>把外部 Agent 的结果粘贴到这里</span>
-                      <textarea className="refill-box" placeholder="把外部 Agent 跑完后的结果粘贴到这里。" value={refillDraft} onChange={(event) => setRefillDraft(event.target.value)} />
-                    </label>
-                    <div className="action-row">
-                      <button type="button" className="primary-button" onClick={handleRefill}>写入结果</button>
-                    </div>
-                    {activeTask.refill ? <div className="result-block"><strong>最近一次结果摘要</strong><p>{activeTask.refill.summary}</p></div> : null}
-                  </div>
-
-                  <div className="thread-entry system">
-                    <span className="thread-role">任务记录</span>
-                    <div className="timeline-list">
-                      {(activeTask.logs || []).map((log, index) => (
-                        <div key={`${log.at}-${index}`} className="timeline-row">
+                    <div className="activity-list">
+                      {(activeTask.logs || []).slice(-5).reverse().map((log, index) => (
+                        <div key={`${log.at}-${index}`} className="activity-row">
                           <span>{shortDate(log.at)}</span>
                           <p>{normalizeLogMessage(log.message)}</p>
                         </div>
                       ))}
                     </div>
-                  </div>
-                </section>
+                  </section>
+                </aside>
               </div>
             ) : (
               <div className="empty-workspace">
@@ -1100,12 +1166,12 @@ function App() {
                     <span onClick={(event) => event.stopPropagation()}>
                       <input type="checkbox" checked={selectedLeadIds.includes(lead.id)} onChange={() => toggleLeadSelection(lead.id)} />
                     </span>
-                    <span><strong>{lead.name}</strong><small>{lead.followers}</small></span>
-                    <span>{lead.platform}</span>
+                    <span><strong>{normalizeDisplayText(lead.name)}</strong><small>{lead.followers}</small></span>
+                    <span>{normalizeDisplayText(lead.platform)}</span>
                     <span>{lead.fitScore}</span>
-                    <span><em className={`status-pill ${statusClass(lead.status)}`}>{lead.status}</em></span>
-                    <span>{lead.handling}</span>
-                    <span>{lead.nextAction}</span>
+                    <span><em className={`status-pill ${statusClass(lead.status)}`}>{normalizeDisplayText(lead.status)}</em></span>
+                    <span>{normalizeDisplayText(lead.handling)}</span>
+                    <span>{normalizeDisplayText(lead.nextAction)}</span>
                   </button>
                 ))}
               </div>
@@ -1121,14 +1187,14 @@ function App() {
                 <div className="panel-head">
                   <div>
                     <p className="eyebrow">当前对象</p>
-                    <h3>{activeLead.name}</h3>
+                    <h3>{normalizeDisplayText(activeLead.name)}</h3>
                   </div>
-                  <em className={`status-pill ${statusClass(activeLead.status)}`}>{activeLead.status}</em>
+                  <em className={`status-pill ${statusClass(activeLead.status)}`}>{normalizeDisplayText(activeLead.status)}</em>
                 </div>
                 <div className="meta-grid">
-                  <div><span>平台</span><strong>{activeLead.platform}</strong></div>
-                  <div><span>处理方式</span><strong>{activeLead.handling}</strong></div>
-                  <div className="wide"><span>下一步</span><strong>{activeLead.nextAction}</strong></div>
+                  <div><span>平台</span><strong>{normalizeDisplayText(activeLead.platform)}</strong></div>
+                  <div><span>处理方式</span><strong>{normalizeDisplayText(activeLead.handling)}</strong></div>
+                  <div className="wide"><span>下一步</span><strong>{normalizeDisplayText(activeLead.nextAction)}</strong></div>
                 </div>
                 <div className="action-row wrap">
                   <button type="button" className="secondary-button" onClick={() => openProfile(activeLead)}>打开对象页</button>
@@ -1151,8 +1217,8 @@ function App() {
               </div>
               {recentConversations.length ? recentConversations.map((lead) => (
                 <button key={lead.id} type="button" className={activeLead?.id === lead.id ? 'conversation-chip active' : 'conversation-chip'} onClick={() => { setSelectedTaskId(lead.taskId); setSelectedLeadId(lead.id) }}>
-                  <strong>{lead.name}</strong>
-                  <span>{lead.platform} · {lead.status}</span>
+                  <strong>{normalizeDisplayText(lead.name)}</strong>
+                  <span>{normalizeDisplayText(lead.platform)} · {normalizeDisplayText(lead.status)}</span>
                 </button>
               )) : <div className="empty-copy dark">还没有需要处理的会话。</div>}
             </div>
@@ -1161,9 +1227,9 @@ function App() {
               <div className="panel-head">
                 <div>
                   <p className="eyebrow">当前会话</p>
-                  <h3>{activeLead?.name || '暂无对象'}</h3>
+                  <h3>{activeLead ? normalizeDisplayText(activeLead.name) : '暂无对象'}</h3>
                 </div>
-                {activeLead ? <em className={`status-pill ${statusClass(activeLead.status)}`}>{activeLead.status}</em> : null}
+                {activeLead ? <em className={`status-pill ${statusClass(activeLead.status)}`}>{normalizeDisplayText(activeLead.status)}</em> : null}
               </div>
 
               {activeLead ? (

@@ -82,7 +82,7 @@ function defaultPreferences() {
     brandProfile: {
       intro: '我们是一套套在外部 Agent 之上的跨境外联业务壳层，负责统一记忆、任务编排、回填和资产沉淀。',
       primaryProducts: '恢复类设备、居家健身配件、健康生活方式产品',
-      productLinks: 'https://example.com/product-1\nhttps://example.com/product-2',
+      productLinks: 'https://northstarbeauty.com/products/recovery-wrap-pro\nhttps://northstarbeauty.com/products/heat-relief-patch',
       quarterFocus: '本季度优先推动恢复类设备和礼品合作切口。',
       pricingStrategy: '默认寄样 + 佣金，优先控制固定费用，必要时根据对象级别单独放宽。',
       productPoints: '恢复类设备 / 居家健身 / 健康生活方式',
@@ -91,10 +91,10 @@ function defaultPreferences() {
       faq: '是否支持寄样、佣金边界、物流周期、品牌卖点、竞品差异。',
     },
     channelConfig: {
-      provider: 'opencloud',
-      opencloudName: 'OpenCloud',
-      opencloudUrl: 'https://app.opencloud.com',
-      codexName: 'ChatGPT / CloudX',
+      provider: 'codex',
+      opencloudName: 'OpenClaw Workspace',
+      opencloudUrl: '',
+      codexName: 'Codex / ChatGPT',
       codexUrl: 'https://chatgpt.com',
       gmailSender: '',
       gmailSignature: 'Best regards,\nFangzhou AI',
@@ -439,11 +439,11 @@ function createStructuredTask({ brandId, userId, moduleId, instruction, brands }
     '',
     `品牌：${brand?.name || '-'}`,
     `业务模块：${module.name}`,
-    `BD层级：${serviceTrack.name}`,
+    `工作模式：${serviceTrack.name}`,
     `任务目标：${instruction.trim()}`,
     '',
     '## 你现在要完成的工作',
-    '请你作为具备浏览器访问能力的外部执行 Agent，围绕本任务完成名单搜集、初步筛选和结构化整理。',
+    '请你作为具备浏览器访问能力的外部执行提供方，围绕本任务完成对象搜集、初步筛选和结构化整理。',
     '',
     '## 重点来源',
     ...serviceTrack.targets.map((item, index) => `${index + 1}. ${item}`),
@@ -453,10 +453,10 @@ function createStructuredTask({ brandId, userId, moduleId, instruction, brands }
     '',
     '## 回填格式',
     '### 执行摘要',
-    '- 用 3-5 条概括本次 BD 产出',
+    '- 用 3-5 条概括本次外联产出',
     '',
-    '### 名单 / 证据',
-    '- 给出达人名称、平台、链接、粉丝量、匹配理由或资源说明',
+    '### 对象 / 证据',
+    '- 给出对象名称、平台、链接、匹配理由或资源说明',
     '',
     '### 建议后续动作',
     '- 输出下一步应推进的 3 条动作',
@@ -494,130 +494,130 @@ function createStructuredTask({ brandId, userId, moduleId, instruction, brands }
 function createDemoLeadSet(task) {
   const rows = [
     {
-      name: 'Mia Moves',
-      platform: 'TikTok',
-      followers: '12.4万',
-      fitScore: 92,
+      name: 'Pulse Review Lab',
+      platform: 'YouTube',
+      followers: '频道',
+      fitScore: 91,
       contact: 'Gmail',
       status: '已回复',
       handling: 'AI辅助回复',
-      lastAction: '达人报 $250 + 寄样',
-      nextAction: '给 3 个回复版本',
-      intent: '有兴趣，但报价超约束',
-      risk: '固定费超出当前合作约束',
-      notes: '内容风格贴近居家健身，评论区互动质量高。',
+      lastAction: '对方回复要媒体包与合作条件',
+      nextAction: '补一版品牌说明与报价边界',
+      intent: '有兴趣，但需要更多资料',
+      risk: '品牌资料不完整会拖慢推进',
+      notes: '适合做测评合作，重点看发布时间和栏目形式。',
       reminderAt: null,
       reminderNote: '',
       messages: [
-        { role: 'system', text: '当前合作约束：佣金上限 14%；可寄样；不接受固定费；排除竞品达人' },
-        { role: 'agent', text: 'Hi Mia, we are exploring a sample + commission collaboration for the US fitness audience.' },
-        { role: 'creator', text: 'I can do it for $250 + gifted product.' },
+        { role: 'system', text: '当前合作约束：优先寄样 + CPA；避免先承诺固定媒体包费用。' },
+        { role: 'agent', text: 'Hi, we are planning a spring recovery product push and would like to explore a review collaboration.' },
+        { role: 'creator', text: 'Can you share a short brand intro, launch timing, and budget structure first?' },
       ],
     },
     {
-      name: 'Coach Lena',
-      platform: 'Instagram',
-      followers: '31万',
-      fitScore: 89,
-      contact: 'Instagram DM',
+      name: 'Deal Circle Daily',
+      platform: '渠道站点',
+      followers: '站点',
+      fitScore: 88,
+      contact: 'Gmail',
       status: '洽谈中',
       handling: '人工接管',
-      lastAction: '对方询问排期和历史案例',
-      nextAction: '补品牌资料并人工跟进',
-      intent: '高价值候选，需要深聊',
-      risk: '涉及排期、案例和 exclusivity',
-      notes: '账号内容质量高，适合品牌形象合作。',
+      lastAction: '对方确认可排进 4 月 newsletter',
+      nextAction: '确认样品、折扣和 tracking 方案',
+      intent: '高价值候选，需要定最终方案',
+      risk: '需要确定折扣机制与 tracking 口径',
+      notes: '可直接带动首轮冷启动，适合人工确认细节。',
       reminderAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-      reminderNote: '明天补品牌资料并继续推进',
+      reminderNote: '明天确认 newsletter 资源位和 tracking 链接',
       messages: [
         { role: 'system', text: '高价值对象，建议人工接管。' },
-        { role: 'creator', text: 'Can you share more details about timing, expected deliverables, and previous campaigns?' },
+        { role: 'creator', text: 'We can feature this in our April wellness newsletter if you confirm discount, sample timing, and tracking links.' },
       ],
     },
     {
-      name: 'HomeGym Abby',
-      platform: 'TikTok',
-      followers: '6.8万',
-      fitScore: 87,
+      name: 'North Star Weekly Picks',
+      platform: 'Affiliate',
+      followers: '联盟客',
+      fitScore: 84,
       contact: 'Gmail',
       status: '已触达',
       handling: '自动触达',
-      lastAction: '首轮消息已发',
-      nextAction: '等待 48 小时后自动二跟',
+      lastAction: '首轮合作说明已发',
+      nextAction: '等待 48 小时后检查是否需要二次跟进',
       intent: '等待回复',
       risk: '暂无',
-      notes: '适合标准化首轮触达。',
+      notes: '适合标准化首轮推进，先验证转化位和佣金模式。',
       reminderAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
       reminderNote: '48 小时后检查是否需要二次触达',
       messages: [{ role: 'system', text: '已发送首轮触达，暂时无需人工介入。' }],
     },
     {
-      name: 'Fit Deals Hub',
-      platform: 'Deal站',
+      name: 'Lifted Living Editorial',
+      platform: '媒体合作',
       followers: '站点',
       fitScore: 81,
       contact: 'Gmail',
       status: '初筛通过',
       handling: '自动触达',
-      lastAction: '已进入候选池',
-      nextAction: '等待批量发送',
+      lastAction: '已进入本周候选池',
+      nextAction: '等待首轮媒体外联',
       intent: '可批量推进',
-      risk: '需确认站点受众匹配',
-      notes: 'Deal 站资源，适合低成本引流测试。',
+      risk: '需确认内容栏目与产品切口匹配',
+      notes: '媒体栏目偏恢复和 wellness，适合作为品牌背书位。',
       reminderAt: null,
       reminderNote: '',
       messages: [{ role: 'system', text: '已通过初筛，等待首轮建联。' }],
     },
     {
-      name: 'Lift With Nora',
+      name: 'Studio Cart Finds',
       platform: 'Instagram',
-      followers: '8.2万',
-      fitScore: 84,
+      followers: '12.8万',
+      fitScore: 82,
       contact: 'Instagram DM',
       status: '已抓取',
       handling: '自动触达',
-      lastAction: '抓取到主页与邮箱',
-      nextAction: '判断内容风格是否入池',
+      lastAction: '抓取到主页与联系入口',
+      nextAction: '判断是否进入本周名单',
       intent: '待初筛',
       risk: '暂无',
-      notes: '主页风格偏女性力量训练，待确认是否匹配产品受众。',
+      notes: '偏生活方式与礼物推荐，待确认是否匹配本季切口。',
       reminderAt: null,
       reminderNote: '',
       messages: [{ role: 'system', text: '刚进入候选池，还没有会话。' }],
     },
     {
-      name: 'Wellness Weekly',
-      platform: '媒体 PR',
+      name: 'Recovery Notes Media',
+      platform: '媒体合作',
       followers: '媒体',
       fitScore: 76,
       contact: 'Gmail',
       status: '待人工接管',
       handling: '人工接管',
-      lastAction: '对方要求品牌背景与媒体包',
-      nextAction: '准备品牌资料后再回',
+      lastAction: '对方要求品牌背景、定价和 campaign 目标',
+      nextAction: '补齐品牌资料后再回',
       intent: '需提供更完整品牌信息',
       risk: '信息不完整会影响推进',
-      notes: '媒体方问得比较细，不适合自动回复。',
+      notes: '对内容要求细，适合人工确认叙事和 KPI。',
       reminderAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       reminderNote: '补品牌背景与 KPI 资料',
-      messages: [{ role: 'creator', text: 'Please send over your brand background, KPIs, and campaign examples.' }],
+      messages: [{ role: 'creator', text: 'Please send over your brand background, KPIs, campaign examples, and the key product angle for this quarter.' }],
     },
     {
-      name: 'PowerCore Jay',
-      platform: 'YouTube',
-      followers: '22万',
-      fitScore: 83,
+      name: 'Everyday Reset Picks',
+      platform: 'Affiliate',
+      followers: '联盟客',
+      fitScore: 86,
       contact: 'Gmail',
       status: '已确认合作',
       handling: '人工接管',
-      lastAction: '已确认寄样 + 佣金',
-      nextAction: '移交履约',
+      lastAction: '已确认样品寄送 + CPS 机制',
+      nextAction: '移交履约并跟踪发布时间',
       intent: '已达成合作',
       risk: '需跟踪发样和发布时间',
-      notes: '可作为本任务示范案例。',
+      notes: '可作为当前品牌外联的示范资产。',
       reminderAt: null,
       reminderNote: '',
-      messages: [{ role: 'creator', text: 'Sounds good. I am happy with gifted product + commission. Let us move ahead.' }],
+      messages: [{ role: 'creator', text: 'Sounds good. Gifted product plus CPS works for us. Please share the final links and shipping plan.' }],
     },
   ]
 
@@ -790,21 +790,24 @@ async function seedDemoData() {
 
   const baseTaskPayloads = [
     {
-      instruction: '任务名称：美国健身达人首轮触达\n产品：筋膜枪 SKU-01\n市场：美国\n行业方向：健身\n目标平台：TikTok / Instagram\n触达方式：Gmail / Instagram DM\n达人范围：5k - 100k\n合作方式：寄样 + 佣金\n合作约束：佣金上限 14%；可寄样；不接受固定费；排除竞品达人\n目标触达：50 位达人',
+      brandId: 'brand-demo-2',
+      instruction: '任务名称：North Star 春季外联启动\n产品：Recovery Wrap Pro\n市场：美国\n行业方向：Recovery / Wellness\n目标平台：YouTube / 渠道站点 / 媒体合作\n触达方式：Gmail / Instagram DM\n对象范围：测评频道 / 渠道站点 / 媒体合作方\n合作方式：寄样 + CPS\n合作约束：优先寄样 + CPS；默认不接受固定媒体包费用；优先近 90 天无竞品合作对象\n目标触达：30 个合作对象',
       completed: true,
     },
     {
-      instruction: '任务名称：中腰部红人首轮话术\n产品：筋膜枪 SKU-01\n市场：美国\n行业方向：健身\n目标平台：TikTok / Instagram\n触达方式：Gmail / Instagram DM\n达人范围：50k - 300k\n合作方式：寄样 + 佣金\n合作约束：佣金上限 14%；可寄样；不接受固定费；排除竞品达人\n目标触达：10 位达人',
+      brandId: 'brand-demo-2',
+      instruction: '任务名称：Mother’s Day 渠道合作名单\n产品：Heat Relief Patch\n市场：美国\n行业方向：Gift / Wellness\n目标平台：渠道站点 / Affiliate / 媒体合作\n触达方式：Gmail\n对象范围：newsletter / coupon partner / affiliate partner\n合作方式：名单整理 + 首轮话术\n合作约束：优先 CPA / CPS；可寄样；需要可追踪链接\n目标触达：18 个合作对象',
       completed: false,
     },
   ]
 
   if (!supabaseEnabled) {
-    if (memoryTasks.length === 0) {
+    const hasInvestorDemo = memoryTasks.some((item) => item.brandId === 'brand-demo-2' && item.userId === 'user-demo-1')
+    if (!hasInvestorDemo) {
       const brands = demoBrands
       for (const payload of baseTaskPayloads) {
         const task = createStructuredTask({
-          brandId: 'brand-demo-1',
+          brandId: payload.brandId,
           userId: 'user-demo-1',
           moduleId: 'traffic-acquisition',
           instruction: payload.instruction,
@@ -817,20 +820,20 @@ async function seedDemoData() {
           task.completedAt = nowIso()
           task.executionPackage.externalStatus = '已回填'
           task.refill = parseRefillResult(`### 执行摘要
-- 已完成 50 个 TikTok 健身垂类红人的首轮搜集与基础筛选。
-- 其中 18 个账号与品牌调性高度匹配，可优先推进建联。
-- 名单中有 7 个账号近期与竞品有合作记录，需要调整切入方式。
+- 已完成一轮 spring launch 外联清单整理，覆盖测评频道、渠道站点和媒体合作对象。
+- 当前已有 4 个高优先级对象进入沟通，其中 1 个渠道站点已确认 4 月合作窗口。
+- 品牌资料已经补进任务上下文，下一轮可以继续放大到 affiliate 和 newsletter 合作。
 
-### 名单 / 证据
-- @fitbymia：TikTok，粉丝 12.4 万，互动稳定，适合做短期测款合作。
-- @coachlena：TikTok，粉丝 31 万，评论区女性用户占比高。
-- @gymdealhunter：Deal 站内容账号，适合导流活动合作。
+### 对象 / 证据
+- Pulse Review Lab：YouTube 测评频道，已回复并索要品牌资料。
+- Deal Circle Daily：渠道站点，已进入 4 月 newsletter 洽谈。
+- Recovery Notes Media：媒体合作方，要求补品牌背景和 KPI。
 
 ### 建议后续动作
-- 先推进前 10 个高匹配账号的首轮建联。
-- 将有竞品合作记录的达人单独列出，重新设计切入话术。
-- 再补一轮英国市场的女性健身达人名单。`)
-          appendLogs(task, ['首轮达人名单已完成回填。', '系统已生成本周优先推进建议。'])
+- 先把品牌背景、价格策略和主推产品补到统一资料页。
+- 下一轮优先扩大 affiliate / channel partner 名单，而不是继续加更多泛创作者。
+- 把已回复对象统一推进到具体合作条件确认。`)
+          appendLogs(task, ['首轮外联清单已完成回填。', '系统已生成下一轮推进建议。'])
         } else {
           appendLogs(task, ['等待发给外部 Agent 执行。'])
         }
@@ -860,6 +863,7 @@ async function seedDemoData() {
     .from('tasks')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', 'user-demo-1')
+    .eq('brand_id', 'brand-demo-2')
 
   if (countError) throw countError
   if ((count || 0) > 0) {
@@ -870,7 +874,7 @@ async function seedDemoData() {
   const brands = demoBrands
   for (const payload of baseTaskPayloads) {
     const task = createStructuredTask({
-      brandId: 'brand-demo-1',
+      brandId: payload.brandId,
       userId: 'user-demo-1',
       moduleId: 'traffic-acquisition',
       instruction: payload.instruction,
@@ -883,20 +887,20 @@ async function seedDemoData() {
       task.completedAt = nowIso()
       task.executionPackage.externalStatus = '已回填'
       task.refill = parseRefillResult(`### 执行摘要
-- 已完成 50 个 TikTok 健身垂类红人的首轮搜集与基础筛选。
-- 其中 18 个账号与品牌调性高度匹配，可优先推进建联。
-- 名单中有 7 个账号近期与竞品有合作记录，需要调整切入方式。
+- 已完成一轮 spring launch 外联清单整理，覆盖测评频道、渠道站点和媒体合作对象。
+- 当前已有 4 个高优先级对象进入沟通，其中 1 个渠道站点已确认 4 月合作窗口。
+- 品牌资料已经补进任务上下文，下一轮可以继续放大到 affiliate 和 newsletter 合作。
 
-### 名单 / 证据
-- @fitbymia：TikTok，粉丝 12.4 万，互动稳定，适合做短期测款合作。
-- @coachlena：TikTok，粉丝 31 万，评论区女性用户占比高。
-- @gymdealhunter：Deal 站内容账号，适合导流活动合作。
+### 对象 / 证据
+- Pulse Review Lab：YouTube 测评频道，已回复并索要品牌资料。
+- Deal Circle Daily：渠道站点，已进入 4 月 newsletter 洽谈。
+- Recovery Notes Media：媒体合作方，要求补品牌背景和 KPI。
 
 ### 建议后续动作
-- 先推进前 10 个高匹配账号的首轮建联。
-- 将有竞品合作记录的达人单独列出，重新设计切入话术。
-- 再补一轮英国市场的女性健身达人名单。`)
-      appendLogs(task, ['首轮达人名单已完成回填。', '系统已生成本周优先推进建议。'])
+- 先把品牌背景、价格策略和主推产品补到统一资料页。
+- 下一轮优先扩大 affiliate / channel partner 名单，而不是继续加更多泛创作者。
+- 把已回复对象统一推进到具体合作条件确认。`)
+      appendLogs(task, ['首轮外联清单已完成回填。', '系统已生成下一轮推进建议。'])
     } else {
       appendLogs(task, ['等待发给外部 Agent 执行。'])
     }
