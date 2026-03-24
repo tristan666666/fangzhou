@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import './app.css'
 
 const navItems = [
-  { id: 'overview', label: '总览' },
+  { id: 'overview', label: '工作台' },
   { id: 'tasks', label: '任务' },
   { id: 'assets', label: '资产' },
   { id: 'conversations', label: '会话' },
@@ -372,7 +372,7 @@ function App() {
   const [currentUser, setCurrentUser] = useState(null)
   const [dashboard, setDashboard] = useState(emptyDashboard)
   const [brandId, setBrandId] = useState('')
-  const [pageId, setPageId] = useState('overview')
+  const [pageId, setPageId] = useState('tasks')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [activeTaskId, setActiveTaskId] = useState('')
   const [selectedAssetId, setSelectedAssetId] = useState('')
@@ -634,7 +634,7 @@ function App() {
     setActiveTaskId('')
     setSelectedAssetId('')
     setSelectedAssetIds([])
-    setPageId('overview')
+    setPageId('tasks')
   }
 
   async function reloadDashboard(nextTaskId = activeTaskId) {
@@ -812,6 +812,10 @@ function App() {
     }
 
     try {
+      if (!String(activeTask.status || '').includes('执行')) {
+        await apiFetch(`/api/tasks/${activeTask.id}/submit`, { method: 'POST' }, token)
+        await reloadDashboard(activeTask.id)
+      }
       await copyText(activeTask.executionPackage.content)
       openUrl(baseUrl)
       setNotice(`已复制执行包并打开 ${label}`)
@@ -918,19 +922,16 @@ function App() {
   function renderOverviewPage() {
     return (
       <div className="panel-stack">
-        <section className="hero-panel">
+        <section className="hero-panel compact-hero">
           <div className="hero-copy">
-            <p className="hero-kicker">Outreach Operating Layer</p>
-            <h1>不是再造一个 Agent，而是把所有 Agent 接进你的外联业务里。</h1>
-            <p>
-              方洲AI 的价值不在于替代 OpenCloud、Codex 或人工，而在于把任务、会话、回填、品牌资料和资产沉淀统一到同一层。
-              这样每一次触达都不会散在不同工具里。
-            </p>
+            <p className="hero-kicker">Workspace</p>
+            <h1>先告诉系统你要推进什么合作，再把执行结果收回来。</h1>
+            <p>这页只保留你今天真正要看的东西：任务、提醒、回填和最近结果。</p>
           </div>
           <div className="hero-facts">
             <article><span>今日任务</span><strong>{dashboard.overview.todayTaskCount}</strong></article>
             <article><span>待回填</span><strong>{dashboard.overview.pendingRefillCount}</strong></article>
-            <article><span>待处理提醒</span><strong>{dashboard.overview.reminderCount}</strong></article>
+            <article><span>待提醒</span><strong>{dashboard.overview.reminderCount}</strong></article>
           </div>
         </section>
 
@@ -944,21 +945,21 @@ function App() {
         <div className="content-grid two-up">
           <section className="workspace-card">
             <div className="section-title">
-              <p>这层壳真正解决什么</p>
-              <h2>别人直接用 Agent，也很难替代这层系统。</h2>
+              <p>今天的待办</p>
+              <h2>当前工作区里最值得优先处理的动作</h2>
             </div>
             <div className="bullet-grid">
-              <article><strong>统一任务</strong><p>把自然语言目标转成结构化执行包，直接送去外部 Agent 跑。</p></article>
-              <article><strong>统一记忆</strong><p>品牌资料、沟通约束、历史会话和回填结果都统一留在云端。</p></article>
-              <article><strong>统一回填</strong><p>外部 Agent 跑完后，不是散落在聊天窗口里，而是回到任务与资产上。</p></article>
-              <article><strong>统一资产</strong><p>达人、媒体、Deal 站、联盟客都会积累为品牌自己的外联资产池。</p></article>
+              <article><strong>去任务页写清目标</strong><p>自然语言输入你要找谁、在哪个平台、怎么合作，系统会给出执行任务。</p></article>
+              <article><strong>把任务交给外部执行器</strong><p>复制任务包后，可以直接带去小龙虾 OpenCloud、CloudX 或 ChatGPT 执行。</p></article>
+              <article><strong>把结果贴回来</strong><p>外部执行后的名单、摘要和建议都需要回填回来，系统才会更新资产和后续动作。</p></article>
+              <article><strong>去资产和会话继续推进</strong><p>回填后的对象会进入资产池和会话页，后续跟进都在这里继续做。</p></article>
             </div>
           </section>
 
           <section className="workspace-card">
             <div className="section-title">
               <p>最近结果</p>
-              <h2>已经回填回来的任务</h2>
+              <h2>已经写回系统的执行结果</h2>
             </div>
             <div className="timeline-list">
               {dashboard.recentResults.length ? dashboard.recentResults.map((item) => (
@@ -981,13 +982,13 @@ function App() {
         <div className="content-grid two-up wide-right">
           <section className="workspace-card">
             <div className="section-title">
-              <p>创建任务</p>
-              <h2>直接描述目标，系统帮你生成执行任务。</h2>
+              <p>新任务</p>
+              <h2>像 ChatGPT 一样输入目标，但输出的是可执行的外联任务。</h2>
             </div>
 
             <label className="field-block">
               <span>自然语言任务输入</span>
-              <textarea className="textarea large" value={taskPrompt} onChange={(event) => setTaskPrompt(event.target.value)} placeholder="例如：帮我创建一个美国健身类 TikTok 达人首轮触达任务，目标 50 位对象，佣金不超过 14%。" />
+              <textarea className="textarea large" value={taskPrompt} onChange={(event) => setTaskPrompt(event.target.value)} placeholder="例如：帮我找 50 个美国健身类 TikTok 达人，合作方式是寄样 + 佣金，佣金不超过 14%。" />
             </label>
 
             <div className="chip-row">
@@ -1036,17 +1037,16 @@ function App() {
 
                 <div className="package-block">
                   <div className="section-title compact">
-                    <p>执行方案</p>
-                    <h3>{activeTask.executionPackage?.title || '当前暂无执行方案'}</h3>
+                    <p>执行任务包</p>
+                    <h3>{activeTask.executionPackage?.title || '当前暂无执行任务包'}</h3>
                   </div>
-                  <pre>{activeTask.executionPackage?.content || '创建任务后，这里会生成真正可复制、可下载、可带去 OpenCloud / Codex 的执行包。'}</pre>
+                  <pre>{activeTask.executionPackage?.content || '创建任务后，这里会生成真正可复制、可下载、可带去外部执行器的任务包。'}</pre>
                   <div className="action-bar wrap">
-                    <button type="button" className="secondary-button" onClick={copyExecutionPackage}>复制执行包</button>
+                    <button type="button" className="secondary-button" onClick={copyExecutionPackage}>仅复制任务包</button>
                     <button type="button" className="secondary-button" onClick={downloadExecutionPackage}>下载 txt</button>
-                    <button type="button" className="secondary-button" onClick={() => launchExternal(channelConfig.opencloudUrl, 'OpenCloud')}>打开 OpenCloud</button>
-                    <button type="button" className="secondary-button" onClick={() => launchExternal(channelConfig.codexUrl, 'Codex')}>打开 Codex</button>
-                    <button type="button" className="primary-button" onClick={sendToExternalAgent} disabled={loading}>标记为外部执行中</button>
-                    <button type="button" className="secondary-button" onClick={markWaitingRefill} disabled={loading}>标记待回填</button>
+                    <button type="button" className="primary-button" onClick={() => launchExternal(channelConfig.opencloudUrl, '小龙虾 OpenCloud')} disabled={loading}>复制给小龙虾 OpenCloud</button>
+                    <button type="button" className="secondary-button" onClick={() => launchExternal(channelConfig.codexUrl, 'CloudX / ChatGPT')} disabled={loading}>复制给 CloudX / ChatGPT</button>
+                    <button type="button" className="secondary-button" onClick={markWaitingRefill} disabled={loading}>我已经跑完，准备回填</button>
                   </div>
                 </div>
 
@@ -1054,10 +1054,10 @@ function App() {
                   <section className="subsurface">
                     <div className="section-title compact">
                       <p>回填结果</p>
-                      <h3>外部 Agent 跑完后，把结果粘回来。</h3>
+                      <h3>把外部执行器跑出来的结果贴回来。</h3>
                     </div>
-                    <textarea className="textarea medium" value={refillDraft} onChange={(event) => setRefillDraft(event.target.value)} placeholder="把 OpenCloud / Codex / 人工执行后的摘要、名单、证据与建议粘贴在这里。" />
-                    <button type="button" className="primary-button" onClick={submitRefill} disabled={loading}>回填并入库</button>
+                    <textarea className="textarea medium" value={refillDraft} onChange={(event) => setRefillDraft(event.target.value)} placeholder="把小龙虾 OpenCloud、CloudX、ChatGPT 或人工执行后的摘要、名单、证据与建议粘贴在这里。" />
+                    <button type="button" className="primary-button" onClick={submitRefill} disabled={loading}>写入结果</button>
                   </section>
 
                   <section className="subsurface">
@@ -1259,8 +1259,8 @@ function App() {
         </div>
 
         <div className="connector-grid">
-          <article className="connector-card"><header><strong>OpenCloud</strong><em>外部 Agent</em></header><p>复制执行包后，直接打开外部 Agent 跑任务。</p><button type="button" className="secondary-button" onClick={() => openUrl(channelConfig.opencloudUrl)}>打开 OpenCloud</button></article>
-          <article className="connector-card"><header><strong>Codex / ChatGPT</strong><em>外部 Agent</em></header><p>适合文本处理、执行总结、补结构化回填。</p><button type="button" className="secondary-button" onClick={() => openUrl(channelConfig.codexUrl)}>打开 Codex</button></article>
+          <article className="connector-card"><header><strong>小龙虾 OpenCloud</strong><em>外部执行器</em></header><p>复制任务包后，直接把外联任务送去跑。</p><button type="button" className="secondary-button" onClick={() => openUrl(channelConfig.opencloudUrl)}>打开小龙虾 OpenCloud</button></article>
+          <article className="connector-card"><header><strong>CloudX / ChatGPT</strong><em>外部执行器</em></header><p>适合文本处理、执行总结、补结构化回填。</p><button type="button" className="secondary-button" onClick={() => openUrl(channelConfig.codexUrl)}>打开 CloudX / ChatGPT</button></article>
           <article className="connector-card"><header><strong>YouTube</strong><em>可抓取</em></header><p>按工作空间关键词直接打开搜索结果页。</p><button type="button" className="secondary-button" onClick={() => openUrl(youtubeUrl)}>打开 YouTube 工作空间</button></article>
           <article className="connector-card"><header><strong>Instagram</strong><em>可抓取 / 可私信</em></header><p>按工作空间关键词打开探索搜索。</p><button type="button" className="secondary-button" onClick={() => openUrl(instagramUrl)}>打开 Instagram 工作空间</button></article>
           <article className="connector-card"><header><strong>TikTok</strong><em>可抓取</em></header><p>直接用关键词进入 TikTok 搜索结果。</p><button type="button" className="secondary-button" onClick={() => openUrl(tiktokUrl)}>打开 TikTok 工作空间</button></article>
@@ -1268,8 +1268,8 @@ function App() {
         </div>
 
         <div className="form-grid">
-          <label className="field-block"><span>OpenCloud 地址</span><input value={channelConfig.opencloudUrl} onChange={(event) => setChannelConfig((prev) => ({ ...prev, opencloudUrl: event.target.value }))} /></label>
-          <label className="field-block"><span>Codex / ChatGPT 地址</span><input value={channelConfig.codexUrl} onChange={(event) => setChannelConfig((prev) => ({ ...prev, codexUrl: event.target.value }))} /></label>
+          <label className="field-block"><span>小龙虾 OpenCloud 地址</span><input value={channelConfig.opencloudUrl} onChange={(event) => setChannelConfig((prev) => ({ ...prev, opencloudUrl: event.target.value }))} /></label>
+          <label className="field-block"><span>CloudX / ChatGPT 地址</span><input value={channelConfig.codexUrl} onChange={(event) => setChannelConfig((prev) => ({ ...prev, codexUrl: event.target.value }))} /></label>
           <label className="field-block"><span>Gmail 发件邮箱</span><input value={channelConfig.gmailSender} onChange={(event) => setChannelConfig((prev) => ({ ...prev, gmailSender: event.target.value }))} /></label>
           <label className="field-block"><span>WhatsApp 测试号码</span><input value={channelConfig.whatsappNumber} onChange={(event) => setChannelConfig((prev) => ({ ...prev, whatsappNumber: event.target.value }))} placeholder="例如 15551234567" /></label>
           <label className="field-block"><span>YouTube 工作空间关键词</span><input value={channelConfig.youtubeWorkspace} onChange={(event) => setChannelConfig((prev) => ({ ...prev, youtubeWorkspace: event.target.value }))} /></label>
@@ -1422,11 +1422,11 @@ function App() {
         <section className="login-panel intro-panel">
           <p className="hero-kicker">Outreach Shell for External Agents</p>
           <h1>方洲AI</h1>
-          <p className="login-copy">这不是一个单独的 BD 工具，也不是要替代外部 Agent。它是一层跨境外联业务壳层，把任务、会话、回填和资产沉淀统一放在云端。</p>
+          <p className="login-copy">它不是一个只会建联的工具页。你在这里写任务、看回填、管资产、处理回复，真正的执行再交给外部执行器去跑。</p>
           <div className="intro-grid">
-            <article><strong>统一任务中枢</strong><p>自然语言创建任务，自动生成执行方案，随时可送去 OpenCloud / Codex。</p></article>
-            <article><strong>统一会话与资产</strong><p>达人、媒体、Deal 站、联盟客不会散在不同工具里，都会回到同一系统。</p></article>
-            <article><strong>统一回填闭环</strong><p>外部执行后，不是贴在聊天里就结束，而是自动变成摘要、提醒与下一步动作。</p></article>
+            <article><strong>先写任务</strong><p>像 ChatGPT 一样输入目标，但系统输出的是可执行的外联任务。</p></article>
+            <article><strong>再交给外部执行器</strong><p>可以带去小龙虾 OpenCloud、CloudX、ChatGPT，或者你自己的人来跑。</p></article>
+            <article><strong>最后收回结果</strong><p>结果贴回来后，会更新成摘要、提醒、会话和品牌资产。</p></article>
           </div>
         </section>
 
@@ -1514,7 +1514,7 @@ function App() {
       <main className="workspace">
         <header className="context-strip">
           <div><strong>{currentBrand?.name || '未选择品牌'}</strong><p>{currentBrand?.overview || '这里显示当前品牌的工作语境。'}</p></div>
-          <div className="context-tags"><span>{bootstrap.storageMode}</span><span>{bootstrap.authMode}</span><span>{currentUser?.authMode || 'session'}</span></div>
+          <div className="context-tags"><span>{currentUser?.name || '当前用户'}</span><span>{currentUser?.username || '-'}</span></div>
         </header>
         <section className="workspace-body">{renderCenterContent()}</section>
       </main>

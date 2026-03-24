@@ -30,12 +30,12 @@ const demoBrands = [
   {
     id: 'brand-demo-1',
     name: '方洲AI Demo Brand',
-    overview: '第一阶段只聚焦流量获取，用更少的人完成更高效的红人增长交付。',
+    overview: '当前工作区用于创建外联任务、整理合作对象、处理回复并沉淀品牌资产。',
   },
   {
     id: 'brand-demo-2',
     name: 'North Star Beauty',
-    overview: '以红人拓展和建联推进为主的跨境品牌增长工作空间。',
+    overview: '用于跨境外联推进的品牌空间，可管理任务、资产、会话和品牌资料。',
   },
 ]
 
@@ -69,23 +69,6 @@ const modules = [
     quickTasks: [],
   },
 ]
-
-const boardMetrics = {
-  'brand-demo-1': {
-    influencerPool: 286,
-    outreachInProgress: 34,
-    warmLeads: 11,
-    dealSitePool: 23,
-    mediaPool: 18,
-  },
-  'brand-demo-2': {
-    influencerPool: 132,
-    outreachInProgress: 17,
-    warmLeads: 6,
-    dealSitePool: 12,
-    mediaPool: 7,
-  },
-}
 
 const userTokens = new Map()
 const memoryTasks = []
@@ -942,7 +925,6 @@ function attachConversations(leads, messages) {
 
 async function buildDashboard(userId, brandId) {
   const brandTasks = await listTasks(userId, brandId)
-  const base = boardMetrics[brandId] || boardMetrics['brand-demo-1']
   const completedTasks = brandTasks.filter((item) => item.status === TASK_STATUS.completed)
   const today = new Date().toDateString()
   const todayTasks = brandTasks.filter((item) => new Date(item.createdAt).toDateString() === today)
@@ -962,23 +944,31 @@ async function buildDashboard(userId, brandId) {
     .sort((left, right) => String(left.reminderAt).localeCompare(String(right.reminderAt)))
     .slice(0, 8)
 
+  const allLeads = Object.values(leadsByTask).flat()
+  const dealSitePool = allLeads.filter((lead) => /deal/i.test(String(lead.platform)) || /deal/i.test(String(lead.type || ''))).length
+  const mediaPool = allLeads.filter((lead) => /媒体|editorial|pr|youtube/i.test([lead.platform, lead.type].join(' '))).length
+  const influencerPool = allLeads.length - dealSitePool - mediaPool
+  const activeOutreach = allLeads.filter((lead) => ['已触达', '待回复', '洽谈中', '待接管'].includes(lead.status)).length
+  const warmLeads = allLeads.filter((lead) => ['待回复', '洽谈中', '已合作', '待接管'].includes(lead.status)).length
+  const weeklyCreatorGoal = allLeads.length || 0
+
   return {
     brandId,
     overview: {
-      tagline: 'AI驱动的跨境红人增长服务',
-      weeklyCreatorGoal: 100,
-      outreachInProgress: base.outreachInProgress,
-      warmLeads: base.warmLeads,
+      tagline: '跨境外联任务系统',
+      weeklyCreatorGoal,
+      outreachInProgress: activeOutreach,
+      warmLeads,
       todayTaskCount: todayTasks.length,
       recentResultCount: completedTasks.length,
       pendingRefillCount: brandTasks.filter((item) => item.status === TASK_STATUS.waitingRefill).length,
       reminderCount: reminderLeads.length,
     },
     dataCenter: {
-      influencerPool: base.influencerPool,
-      dealSitePool: base.dealSitePool,
-      mediaPool: base.mediaPool,
-      activeOutreach: base.outreachInProgress,
+      influencerPool,
+      dealSitePool,
+      mediaPool,
+      activeOutreach,
       historyTaskCount: brandTasks.length,
     },
     recentResults: completedTasks.slice(0, 3).map((item) => ({
