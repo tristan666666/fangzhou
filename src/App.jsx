@@ -165,6 +165,23 @@ function inferGoal(text) {
   return match ? `${match[1]} ${match[2]}` : '待确认'
 }
 
+function compactText(text, max = 24) {
+  const value = String(text || '').trim()
+  if (!value) return '未命名任务'
+  return value.length > max ? `${value.slice(0, max)}…` : value
+}
+
+function deriveTaskTitle(text) {
+  const content = String(text || '').trim()
+  const market = inferMarket(content)
+  if (/deal/i.test(content)) return `${market} Deal 站搜集`
+  if (/youtube/i.test(content)) return `${market} YouTube 合作`
+  if (/pr|媒体/i.test(content)) return `${market} 媒体 PR 建联`
+  if (/affiliate|联盟/i.test(content)) return `${market} 联盟客拓展`
+  if (/达人|tiktok|instagram/i.test(content)) return `${market} 达人首轮触达`
+  return compactText(content, 18)
+}
+
 function getLineValue(text, label) {
   const line = String(text || '')
     .split('\n')
@@ -178,7 +195,7 @@ function getLineValue(text, label) {
 function parseTaskSummary(task) {
   const instruction = String(task?.instruction || '')
   const objective = task?.structuredTask?.objective || instruction
-  const fallbackTitle = objective.split('\n')[0] || '未命名任务'
+  const fallbackTitle = deriveTaskTitle(objective.split('\n')[0] || objective)
   const title = getLineValue(instruction, '任务名称') || fallbackTitle
   const product = getLineValue(instruction, '产品') || '未填写产品'
   const market = getLineValue(instruction, '市场') || inferMarket(objective)
@@ -202,7 +219,7 @@ function parseTaskSummary(task) {
 function buildTaskDraft(prompt) {
   const text = String(prompt || '').trim()
   return {
-    title: text ? text.split('，')[0].slice(0, 24) : '等待输入目标',
+    title: text ? deriveTaskTitle(text) : '等待输入目标',
     objectType: inferObjectType(text),
     market: inferMarket(text),
     platforms: inferPlatforms(text),
@@ -270,6 +287,12 @@ function buildSuggestions(lead, prefs) {
     { title: '专业版回复', body: '感谢回复。我们会基于本轮目标和当前合作边界补一版更清楚的合作说明，再同步给你确认。' },
     { title: '推进下一步', body: '建议明确下一步动作，例如补资料、二次跟进或转人工接管，不要让会话停住。' },
   ]
+}
+
+function normalizePackageContent(content) {
+  return String(content || '')
+    .replace('# 方洲AI红人增长执行方案', '# 方洲AI外联执行提示')
+    .replace('执行方案', '执行提示')
 }
 
 function App() {
@@ -347,6 +370,7 @@ function App() {
   const taskSummary = useMemo(() => parseTaskSummary(activeTask), [activeTask])
   const taskDraft = useMemo(() => buildTaskDraft(taskPrompt), [taskPrompt])
   const taskSuggestions = useMemo(() => buildSuggestions(activeLead, preferences), [activeLead, preferences])
+  const packageContent = useMemo(() => normalizePackageContent(activeTask?.executionPackage?.content || ''), [activeTask])
 
   const taskCounts = useMemo(() => {
     const counts = Object.fromEntries(funnelOrder.map((item) => [item, 0]))
@@ -713,7 +737,7 @@ function App() {
           <div className="brand-mark">方</div>
           <div>
             <strong>方洲AI</strong>
-            <p>外联业务壳层</p>
+            <p>Workspace</p>
           </div>
         </div>
 
@@ -878,11 +902,11 @@ function App() {
                   <li>把结果贴回这里，系统会同步更新任务、会话和资产。</li>
                 </ol>
 
-                <textarea className="package-box" value={activeTask?.executionPackage?.content || ''} readOnly />
+                <textarea className="package-box" value={packageContent} readOnly />
 
                 <div className="action-row wrap">
-                  <button type="button" className="secondary-button" onClick={() => copyText(activeTask?.executionPackage?.content || '').then(() => setWorkspaceMessage('执行提示已复制。'))}>复制执行提示</button>
-                  <button type="button" className="secondary-button" onClick={() => downloadText(activeTask?.executionPackage?.exportName || 'task.txt', activeTask?.executionPackage?.content || '')}>下载 .txt</button>
+                  <button type="button" className="secondary-button" onClick={() => copyText(packageContent).then(() => setWorkspaceMessage('执行提示已复制。'))}>复制执行提示</button>
+                  <button type="button" className="secondary-button" onClick={() => downloadText(activeTask?.executionPackage?.exportName || 'task.txt', packageContent)}>下载 .txt</button>
                   <button type="button" className="secondary-button" onClick={() => openExternal(preferences.channelConfig.opencloudUrl)}>打开小龙虾 OpenCloud</button>
                   <button type="button" className="secondary-button" onClick={() => openExternal(preferences.channelConfig.codexUrl)}>打开 ChatGPT / CloudX</button>
                   <button type="button" className="secondary-button" onClick={handleSubmitTask}>标记已发送</button>

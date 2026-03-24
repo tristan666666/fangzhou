@@ -428,7 +428,7 @@ function createStructuredTask({ brandId, userId, moduleId, instruction, brands }
   }
 
   const packageContent = [
-    '# 方洲AI红人增长执行方案',
+    '# 方洲AI外联执行提示',
     '',
     `品牌：${brand?.name || '-'}`,
     `业务模块：${module.name}`,
@@ -468,7 +468,7 @@ function createStructuredTask({ brandId, userId, moduleId, instruction, brands }
     completedAt: null,
     structuredTask,
     executionPackage: {
-      title: `${module.name} · ${serviceTrack.name}执行方案`,
+      title: `${module.name} · ${serviceTrack.name}执行提示`,
       content: packageContent,
       exportName: `${taskId}.txt`,
       externalStatus: '未提交',
