@@ -134,6 +134,15 @@ function copyText(text) {
 
 function inferObjectType(text) {
   const lowered = String(text || '').toLowerCase()
+  if (!lowered.trim()) return '待解析'
+  const matchedCategories = [
+    /deal/.test(lowered),
+    /pr|媒体/.test(lowered),
+    /affiliate|联盟/.test(lowered),
+    /creator|influencer|达人|红人|tiktok|instagram|youtube/.test(lowered),
+  ].filter(Boolean).length
+
+  if (matchedCategories >= 2) return '外联对象组合'
   if (lowered.includes('deal')) return 'Deal 站'
   if (lowered.includes('pr') || lowered.includes('媒体')) return '媒体 / PR'
   if (lowered.includes('affiliate') || lowered.includes('联盟')) return '联盟客'
@@ -142,6 +151,7 @@ function inferObjectType(text) {
 
 function inferPlatforms(text) {
   const lowered = String(text || '').toLowerCase()
+  if (!lowered.trim()) return '待解析'
   const matches = []
   if (lowered.includes('tiktok')) matches.push('TikTok')
   if (lowered.includes('instagram')) matches.push('Instagram')
@@ -153,6 +163,7 @@ function inferPlatforms(text) {
 
 function inferChannel(text) {
   const lowered = String(text || '').toLowerCase()
+  if (!lowered.trim()) return '待解析'
   if (lowered.includes('gmail') || lowered.includes('email') || lowered.includes('邮箱')) return 'Gmail / 邮件'
   if (lowered.includes('whatsapp')) return 'WhatsApp'
   if (lowered.includes('dm')) return '私信'
@@ -161,6 +172,7 @@ function inferChannel(text) {
 
 function inferMarket(text) {
   const lowered = String(text || '').toLowerCase()
+  if (!lowered.trim()) return '待确认'
   if (lowered.includes('美国') || lowered.includes('us')) return '美国'
   if (lowered.includes('英国') || lowered.includes('uk')) return '英国'
   if (lowered.includes('欧洲') || lowered.includes('eu')) return '欧洲'
@@ -168,6 +180,7 @@ function inferMarket(text) {
 }
 
 function inferGoal(text) {
+  if (!String(text || '').trim()) return '待确认'
   const match = String(text || '').match(/(\d+)\s*(位|个|条|人)/)
   return match ? `${match[1]} ${match[2]}` : '待确认'
 }
