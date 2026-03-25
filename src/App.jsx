@@ -18,7 +18,7 @@ const quickPrompts = [
 const navItems = [
   { id: 'tasks', label: '案件对话' },
   { id: 'brand', label: '品牌记忆' },
-  { id: 'channels', label: 'Agent 连接' },
+  { id: 'channels', label: '执行 Agent' },
   { id: 'settings', label: '系统偏好' },
 ]
 
@@ -66,10 +66,10 @@ const defaultPreferences = {
   },
   channelConfig: {
     provider: 'codex',
-    opencloudName: 'OpenClaw Workspace',
+    opencloudName: 'OpenClaw',
     opencloudUrl: '',
-    codexName: 'Codex / ChatGPT',
-    codexUrl: 'https://chatgpt.com',
+    codexName: 'Codex',
+    codexUrl: '',
     gmailSender: '',
     gmailSignature: 'Best regards,\nFangzhou AI',
     whatsappNumber: '',
@@ -251,12 +251,12 @@ function buildTaskDraft(prompt) {
 function channelState(config) {
   return [
     {
-      name: config.opencloudName || 'OpenClaw Workspace',
+      name: config.opencloudName || 'OpenClaw',
       status: config.opencloudUrl ? '已配置' : '未配置',
       description: '这里放主 Agent 的网址。点“开始执行”时，会优先打开这里。',
     },
     {
-      name: config.codexName || 'Codex / ChatGPT',
+      name: config.codexName || 'Codex',
       status: config.codexUrl ? '已配置' : '未配置',
       description: '这里放备用 Agent 的网址。主 Agent 不可用时可以切到这里。',
     },
@@ -277,13 +277,13 @@ function getProviderOptions(config) {
   return [
     {
       id: 'opencloud',
-      label: config.opencloudName || 'OpenClaw Workspace',
+      label: config.opencloudName || 'OpenClaw',
       url: config.opencloudUrl,
       hint: '主 Agent',
     },
     {
       id: 'codex',
-      label: config.codexName || 'Codex / ChatGPT',
+      label: config.codexName || 'Codex',
       url: config.codexUrl,
       hint: '备用 Agent',
     },
@@ -297,10 +297,10 @@ function sanitizePreferences(rawPreferences = {}) {
     settings: { ...defaultPreferences.settings, ...(rawPreferences.settings || {}) },
   }
 
-  if (merged.channelConfig.opencloudName === 'OpenCloud') merged.channelConfig.opencloudName = 'OpenClaw Workspace'
-  if (merged.channelConfig.codexName === 'ChatGPT / CloudX') merged.channelConfig.codexName = 'Codex / ChatGPT'
+  if (merged.channelConfig.opencloudName === 'OpenCloud' || merged.channelConfig.opencloudName === 'OpenClaw Workspace') merged.channelConfig.opencloudName = 'OpenClaw'
+  if (merged.channelConfig.codexName === 'ChatGPT / CloudX' || merged.channelConfig.codexName === 'Codex / ChatGPT') merged.channelConfig.codexName = 'Codex'
   if (merged.channelConfig.opencloudUrl === 'https://app.opencloud.com') merged.channelConfig.opencloudUrl = ''
-  if (!merged.channelConfig.codexUrl) merged.channelConfig.codexUrl = defaultPreferences.channelConfig.codexUrl
+  if (merged.channelConfig.codexUrl === 'https://chatgpt.com') merged.channelConfig.codexUrl = ''
   if (String(merged.brandProfile.productLinks || '').includes('example.com')) {
     merged.brandProfile.productLinks = defaultPreferences.brandProfile.productLinks
   }
@@ -319,6 +319,39 @@ function buildMemoryDigest(profile) {
     { label: '价格策略', value: profile.pricingStrategy || '还没写' },
     { label: '产品链接', value: profile.productLinks || '还没写' },
   ]
+}
+
+function buildBrandMemoryFile(profile) {
+  return [
+    '# Brand Memory',
+    '',
+    `Brand Background`,
+    profile.intro || 'Not filled yet.',
+    '',
+    `Quarter Focus`,
+    profile.quarterFocus || 'Not filled yet.',
+    '',
+    `Key Products`,
+    profile.primaryProducts || 'Not filled yet.',
+    '',
+    `Product Links`,
+    profile.productLinks || 'Not filled yet.',
+    '',
+    `Pricing Strategy`,
+    profile.pricingStrategy || 'Not filled yet.',
+    '',
+    `Core Selling Points`,
+    profile.productPoints || 'Not filled yet.',
+    '',
+    `Accepted Cooperation Modes`,
+    profile.cooperationModes || 'Not filled yet.',
+    '',
+    `Proof / Cases`,
+    profile.campaignProof || 'Not filled yet.',
+    '',
+    `FAQ / Reusable Replies`,
+    profile.faq || 'Not filled yet.',
+  ].join('\n')
 }
 
 function displayTaskStatus(status) {
@@ -346,28 +379,67 @@ function buildSuggestions(lead, prefs) {
   if (!lead) return []
   const latest = lead.conversation?.at(-1)?.text || ''
   const intro = prefs.brandProfile.intro || '品牌记忆还没有补全'
+  const quarterFocus = prefs.brandProfile.quarterFocus || 'this quarter focus'
+  const productPoints = prefs.brandProfile.productPoints || 'product value'
 
   if (/fee|budget|报价|价格|charge/i.test(latest)) {
     return [
-      { title: '压预算版', body: '感谢回复。这轮合作我们优先走寄样 + 佣金模式，当前不接受固定坑位费。如果你愿意，我们可以先跑一轮测试合作。' },
-      { title: '继续沟通版', body: '谢谢你的报价。为了判断是否匹配，我先把本次合作目标和交付方式发给你，你看完后我们再确认更合适的合作结构。' },
-      { title: '人工接管建议', body: '这条对话已经碰到预算边界，建议你人工接手，决定是否放宽当前合作约束。' },
+      { title: '保留在预算内', body: 'Thanks for sharing your rate. For this round, we are prioritizing a gifted product + performance structure, so we are not approving a fixed placement fee at the moment. If that works on your side, I can send over the product angle, timeline, and tracking setup for a test collaboration.' },
+      { title: '继续试探合作方式', body: 'Thanks for the quote. Before we decide on structure, I would love to share our launch objective, product angle, and expected deliverables so we can see whether there is a version that fits both sides.' },
+      { title: '人工接管建议', body: 'This conversation has reached the budget boundary. Please move it to manual review and decide whether this account is important enough to justify a different commercial structure.' },
     ]
   }
 
   if (/background|campaign|案例|品牌/i.test(latest)) {
     return [
-      { title: '补品牌记忆', body: `这里建议先回品牌背景和合作目标。当前品牌记忆里的核心描述：${intro}` },
-      { title: '补证明材料', body: '建议补品牌介绍、过往合作证明和这次的目标，再继续推进。' },
-      { title: '先降复杂度', body: '如果目前资料不全，先给简版介绍和合作方向，再约下一轮更详细沟通。' },
+      { title: '补品牌记忆', body: `Absolutely. We are ${intro}. Our current focus is ${quarterFocus}, and the key product angle we are pushing is ${productPoints}. If helpful, I can also send over campaign context, product links, and the commercial structure we are testing this quarter.` },
+      { title: '补证明材料', body: 'Happy to share more context. I can send a short brand overview, product links, campaign direction, and a few proof points so you can review whether there is a fit before we lock the next step.' },
+      { title: '先发简版说明', body: 'To keep this simple, let me first send a short brand summary, the product angle, and the collaboration format we have in mind. If it looks relevant, we can then move into the more detailed campaign discussion.' },
     ]
   }
 
   return [
-    { title: '自然版回复', body: '收到，我先整理一下这轮合作的重点信息，稍后把更完整的方案发给你。' },
-    { title: '专业版回复', body: '感谢回复。我们会基于本轮目标和当前合作边界补一版更清楚的合作说明，再同步给你确认。' },
-    { title: '推进下一步', body: '建议明确下一步动作，例如补资料、二次跟进或转人工接管，不要让会话停住。' },
+    { title: '自然推进版', body: 'Thanks for getting back to me. Let me pull everything together on our side and I will send you a cleaner summary of the opportunity, timeline, and next step shortly.' },
+    { title: '专业说明版', body: 'Appreciate the reply. We are aligning the collaboration scope internally and will send you a more structured follow-up with product angle, timing, and the expected format.' },
+    { title: '直接推进下一步', body: 'Sounds good. To keep things moving, I can follow up with a short collaboration outline, product links, and the preferred next step for review.' },
   ]
+}
+
+function buildResearchUrl(lead) {
+  const name = String(lead?.name || '').trim()
+  const platform = String(lead?.platform || '').trim()
+  const query = encodeURIComponent(`${name} ${platform}`)
+
+  if (/instagram/i.test(platform)) return `https://www.google.com/search?q=site%3Ainstagram.com+${query}`
+  if (/youtube/i.test(platform)) return `https://www.google.com/search?q=site%3Ayoutube.com+${query}`
+  if (/affiliate|渠道站点|媒体合作/i.test(platform)) return `https://www.google.com/search?q=${query}+contact`
+  return `https://www.google.com/search?q=${query}`
+}
+
+function buildEmailDraft({ lead, summary, prefs, draft }) {
+  const intro = prefs.brandProfile.intro || 'We are reaching out from our brand team.'
+  const productLinks = prefs.brandProfile.productLinks || ''
+  const productPoints = prefs.brandProfile.productPoints || ''
+  const quarterFocus = prefs.brandProfile.quarterFocus || ''
+  const signature = prefs.channelConfig.gmailSignature || 'Best regards,\nFangzhou AI'
+  const subject = summary?.title || 'Collaboration opportunity'
+  const body = draft
+    || [
+      `Hi ${lead?.name || 'there'},`,
+      '',
+      intro,
+      quarterFocus ? `Current focus: ${quarterFocus}` : '',
+      productPoints ? `Key angle: ${productPoints}` : '',
+      '',
+      'Would love to see if there is a fit for a collaboration.',
+      productLinks ? `Links:\n${productLinks}` : '',
+      '',
+      signature,
+    ]
+      .filter(Boolean)
+      .join('\n')
+
+  return { subject, body }
 }
 
 function normalizePackageContent(content) {
@@ -490,6 +562,7 @@ function App() {
   const connectedProvider = useMemo(() => providerOptions.find((item) => item.id === preferences.channelConfig.provider) || providerOptions[0], [providerOptions, preferences.channelConfig.provider])
   const providerReady = Boolean(connectedProvider?.url)
   const memoryDigest = useMemo(() => buildMemoryDigest(preferences.brandProfile), [preferences.brandProfile])
+  const brandMemoryFile = useMemo(() => buildBrandMemoryFile(preferences.brandProfile), [preferences.brandProfile])
 
   const taskSnapshot = useMemo(() => {
     const waitingForYou = currentLeads.filter((lead) => ['待人工接管', '已回复', '洽谈中'].includes(lead.status)).length
@@ -649,7 +722,7 @@ function App() {
     if (!taskPrompt.trim() || !brandId) return
     if (!providerReady) {
       setCurrentPage('channels')
-      setWorkspaceMessage('先去 Agent 连接页把地址填好，再创建任务。')
+      setWorkspaceMessage('先去“执行 Agent”页把地址填好，再创建任务。')
       return
     }
     setCreatingTask(true)
@@ -819,7 +892,7 @@ function App() {
   async function handleOpenWorkspace() {
     if (!providerReady) {
       setCurrentPage('channels')
-      setWorkspaceMessage('先去 Agent 连接页把当前 Agent 地址填好。')
+      setWorkspaceMessage('先去“执行 Agent”页把当前 Agent 地址填好。')
       return
     }
 
@@ -848,22 +921,28 @@ function App() {
   }
 
   function openGmail(lead, draft = '') {
+    const emailDraft = buildEmailDraft({ lead, summary: taskSummary, prefs: preferences, draft: draft || replyDraft })
     const to = encodeURIComponent(lead?.email || '')
-    const subject = encodeURIComponent(taskSummary.title || '合作沟通')
-    const body = encodeURIComponent(draft || replyDraft || preferences.channelConfig.gmailSignature || '')
+    const subject = encodeURIComponent(emailDraft.subject)
+    const body = encodeURIComponent(emailDraft.body)
     openExternal(`https://mail.google.com/mail/?view=cm&fs=1&to=${to}&su=${subject}&body=${body}`)
+    setWorkspaceMessage('已经带着主题和正文打开 Gmail 草稿了。发不发信，仍然由你在 Gmail 里确认。')
   }
 
   function openWhatsApp(lead, draft = '') {
     const phone = String(lead?.phone || preferences.channelConfig.whatsappNumber || '').replace(/[^\d]/g, '')
-    if (!phone) return
-    const text = encodeURIComponent(draft || replyDraft || '')
+    if (!phone) {
+      setWorkspaceMessage('还没有可用的 WhatsApp 号码。先在“执行 Agent”页里填号码，或改用邮件草稿。')
+      return
+    }
+    const text = encodeURIComponent(draft || replyDraft || buildEmailDraft({ lead, summary: taskSummary, prefs: preferences, draft }).body)
     openExternal(`https://wa.me/${phone}${text ? `?text=${text}` : ''}`)
+    setWorkspaceMessage('已经带着当前草稿打开 WhatsApp。真正发送，仍然在 WhatsApp 里完成。')
   }
 
   function openProfile(lead) {
-    const query = encodeURIComponent(`${lead?.name || ''} ${lead?.platform || ''}`)
-    openExternal(`https://www.google.com/search?q=${query}`)
+    openExternal(buildResearchUrl(lead))
+    setWorkspaceMessage('已打开这个对象的公开资料搜索页。你可以先看频道、主页、联系方式，再决定怎么跟进。')
   }
 
   function toggleLeadSelection(id) {
@@ -1019,11 +1098,11 @@ function App() {
 
               <div className={providerReady ? 'connection-banner ready' : 'connection-banner'}>
                 <div>
-                  <strong>{providerReady ? `当前已连接 Agent：${connectedProvider.label}` : '还没有连接 Agent'}</strong>
-                  <p>{providerReady ? '创建案件后，系统会整理好执行提示。你只需要打开这个 Agent，把提示发过去，再把结果贴回来。' : '先去“Agent 连接”页填好主 Agent 或备用 Agent 的地址。'}</p>
+                  <strong>{providerReady ? `默认执行 Agent：${connectedProvider.label}` : '还没有设置默认执行 Agent'}</strong>
+                  <p>{providerReady ? '创建案件后，系统会整理好执行提示。你只需要打开这个执行 Agent，把提示发过去，再把结果贴回来。' : '先去“执行 Agent”页填好主 Agent 或备用 Agent 的地址。'}</p>
                 </div>
                 <button type="button" className="secondary-button" onClick={() => setCurrentPage('channels')}>
-                  {providerReady ? 'Agent 连接' : '去连接 Agent'}
+                  {providerReady ? '执行 Agent' : '去设置执行 Agent'}
                 </button>
               </div>
 
@@ -1086,17 +1165,17 @@ function App() {
 
                     <div className="thread-entry assistant">
                       <span className="thread-role">发送给 Agent 的指令</span>
-                      <p className="thread-copy">点击“开始执行”后，系统会自动复制这段指令并打开你连接的 Agent。你不需要自己再整理一遍。</p>
+                      <p className="thread-copy">点击“开始执行”后，系统会自动复制这段指令，并打开你预先连接好的执行 Agent。你不需要自己再整理一遍。</p>
                       <textarea className="package-box" value={packageContent} readOnly />
                       <div className="action-row wrap">
                         <button type="button" className="primary-button" onClick={handleOpenWorkspace} disabled={!providerReady}>开始执行</button>
                         <button type="button" className="secondary-button" onClick={() => copyText(packageContent).then(() => setWorkspaceMessage('执行指令已复制。'))}>只复制指令</button>
                         <button type="button" className="secondary-button" onClick={() => downloadText(activeTask.executionPackage?.exportName || 'task.txt', packageContent)}>导出指令</button>
-                        <button type="button" className="secondary-button" onClick={() => setCurrentPage('channels')}>Agent 连接</button>
+                        <button type="button" className="secondary-button" onClick={() => setCurrentPage('channels')}>执行 Agent</button>
                       </div>
                       <div className="manual-note">
                         <strong>当前版本不会骗你说“已经自动发出去了”。</strong>
-                        <p>这里负责整理任务、带上品牌记忆、接收结果。真正的执行动作仍然在你连接的 Agent 里完成。</p>
+                        <p>这里负责整理任务、带上品牌记忆、接收结果。真正的执行动作仍然在你连接的执行 Agent 里完成。</p>
                       </div>
                     </div>
 
@@ -1154,12 +1233,15 @@ function App() {
                               <div className="meta-grid">
                                 <div><span>平台</span><strong>{normalizeDisplayText(activeLead.platform)}</strong></div>
                                 <div><span>处理方式</span><strong>{normalizeDisplayText(activeLead.handling)}</strong></div>
+                                <div><span>当前联系入口</span><strong>{normalizeDisplayText(activeLead.contact || '待确认')}</strong></div>
+                                <div><span>最近动作</span><strong>{normalizeDisplayText(activeLead.lastAction)}</strong></div>
                                 <div className="wide"><span>下一步</span><strong>{normalizeDisplayText(activeLead.nextAction)}</strong></div>
                               </div>
+                              <p className="sub-note">这里不会假装替你自动发信。它负责把对象资料、草稿和记录整理好，然后带你去真实沟通入口。</p>
                               <div className="action-row wrap">
-                                <button type="button" className="secondary-button" onClick={() => openProfile(activeLead)}>搜索对象资料</button>
-                                <button type="button" className="secondary-button" onClick={() => openGmail(activeLead)}>打开 Gmail 草稿</button>
-                                <button type="button" className="secondary-button" onClick={() => openWhatsApp(activeLead)}>打开 WhatsApp</button>
+                                <button type="button" className="secondary-button" onClick={() => openProfile(activeLead)}>查看公开资料</button>
+                                <button type="button" className="secondary-button" onClick={() => openGmail(activeLead)}>用邮件草稿跟进</button>
+                                <button type="button" className="secondary-button" onClick={() => openWhatsApp(activeLead)}>用 WhatsApp 跟进</button>
                               </div>
                             </div>
 
@@ -1167,7 +1249,7 @@ function App() {
                               <div className="panel-head">
                                 <div>
                                   <p className="eyebrow">沟通记录</p>
-                                  <h3>直接在这里处理回复</h3>
+                                  <h3>先把回复写好，再决定从哪个入口发出去</h3>
                                 </div>
                               </div>
 
@@ -1181,10 +1263,10 @@ function App() {
                               </div>
 
                               <div className="composer-inline">
-                                <textarea placeholder="先在这里写回复，再决定是记到记录里，还是打开 Gmail / WhatsApp 去发。" value={replyDraft} onChange={(event) => setReplyDraft(event.target.value)} />
+                                <textarea placeholder="先在这里写回复草稿。你可以先保存到案件记录，再带着这段草稿打开邮件或 WhatsApp。" value={replyDraft} onChange={(event) => setReplyDraft(event.target.value)} />
                                 <div className="action-row wrap">
-                                  <button type="button" className="primary-button" onClick={handleSendMessage}>写入沟通记录</button>
-                                  <button type="button" className="secondary-button" onClick={() => openGmail(activeLead, replyDraft)}>带着草稿打开 Gmail</button>
+                                  <button type="button" className="primary-button" onClick={handleSendMessage}>保存到案件记录</button>
+                                  <button type="button" className="secondary-button" onClick={() => openGmail(activeLead, replyDraft)}>带着草稿打开邮件</button>
                                   <button type="button" className="secondary-button" onClick={() => openWhatsApp(activeLead, replyDraft)}>带着草稿打开 WhatsApp</button>
                                   <button type="button" className="secondary-button" onClick={() => handleLeadPatch({ status: '洽谈中' })}>标记洽谈中</button>
                                   <button type="button" className="secondary-button" onClick={() => handleLeadPatch({ status: '待人工接管', handling: '人工接管' })}>标记待接管</button>
@@ -1342,9 +1424,9 @@ function App() {
                   <div className="wide"><span>下一步</span><strong>{normalizeDisplayText(activeLead.nextAction)}</strong></div>
                 </div>
                 <div className="action-row wrap">
-                  <button type="button" className="secondary-button" onClick={() => openProfile(activeLead)}>搜索对象资料</button>
-                  <button type="button" className="secondary-button" onClick={() => openGmail(activeLead)}>用 Gmail 写信</button>
-                  <button type="button" className="secondary-button" onClick={() => openWhatsApp(activeLead)}>打开 WhatsApp</button>
+                  <button type="button" className="secondary-button" onClick={() => openProfile(activeLead)}>查看公开资料</button>
+                  <button type="button" className="secondary-button" onClick={() => openGmail(activeLead)}>用邮件草稿跟进</button>
+                  <button type="button" className="secondary-button" onClick={() => openWhatsApp(activeLead)}>用 WhatsApp 跟进</button>
                 </div>
               </div>
             ) : null}
@@ -1391,9 +1473,9 @@ function App() {
                   <div className="composer-inline">
                     <textarea placeholder="在这里写回复。系统会把这条消息保存到当前会话。" value={replyDraft} onChange={(event) => setReplyDraft(event.target.value)} />
                     <div className="action-row">
-                      <button type="button" className="primary-button" onClick={handleSendMessage}>写入沟通记录</button>
-                      <button type="button" className="secondary-button" onClick={() => openGmail(activeLead)}>打开 Gmail 草稿</button>
-                      <button type="button" className="secondary-button" onClick={() => openWhatsApp(activeLead)}>打开 WhatsApp</button>
+                      <button type="button" className="primary-button" onClick={handleSendMessage}>保存到案件记录</button>
+                      <button type="button" className="secondary-button" onClick={() => openGmail(activeLead)}>用邮件草稿跟进</button>
+                      <button type="button" className="secondary-button" onClick={() => openWhatsApp(activeLead)}>用 WhatsApp 跟进</button>
                       <button type="button" className="secondary-button" onClick={() => handleLeadPatch({ status: '待人工接管', handling: '人工接管' })}>标记待接管</button>
                       <button type="button" className="secondary-button" onClick={() => handleLeadPatch({ status: '洽谈中' })}>标记洽谈中</button>
                     </div>
@@ -1440,6 +1522,17 @@ function App() {
                 <p className="eyebrow">品牌记忆库</p>
                 <h3>这里保存品牌长期信息，任务和沟通都会调用这里</h3>
               </div>
+            </div>
+            <div className="memory-file-shell">
+              <div className="memory-file-copy">
+                <strong>给 Agent 的品牌记忆文件</strong>
+                <p>这不是展示卡片，而是会被带进案件执行里的长期记忆。你可以复制或下载给外部 Agent 用。</p>
+              </div>
+              <div className="action-row wrap">
+                <button type="button" className="secondary-button" onClick={() => copyText(brandMemoryFile).then(() => setWorkspaceMessage('品牌记忆文件已复制。'))}>复制记忆文件</button>
+                <button type="button" className="secondary-button" onClick={() => downloadText(`${(activeBrand?.name || 'brand-memory').replace(/[\\/:*?\"<>|]/g, '-')}-memory.md`, brandMemoryFile)}>下载记忆文件</button>
+              </div>
+              <textarea className="memory-file-preview" value={brandMemoryFile} readOnly />
             </div>
             <div className="stack-panel">
               <div className="section-head">
@@ -1511,9 +1604,13 @@ function App() {
           <section className="form-shell">
             <div className="panel-head">
               <div>
-                <p className="eyebrow">Agent 连接</p>
-                <h3>把你常用的 Agent 地址放在这里，案件页会直接跳过去</h3>
+                <p className="eyebrow">执行 Agent</p>
+                <h3>把你常用的执行 Agent 地址放在这里，案件页会直接跳过去</h3>
               </div>
+            </div>
+            <div className="manual-note">
+              <strong>这里是入口配置，不是假装已经 API 打通。</strong>
+              <p>当前版本会带着案件上下文去打开你指定的 Agent 页面，真正的执行仍然在那个 Agent 里完成。跑完以后，把结果贴回案件线程。</p>
             </div>
 
             <div className="provider-picker">
@@ -1548,19 +1645,19 @@ function App() {
 
             <div className="form-grid two">
               <label className="field">
-                <span>主 Agent 名称</span>
+                <span>主执行 Agent 名称</span>
                 <input value={preferences.channelConfig.opencloudName} onChange={(event) => setPreferences((current) => ({ ...current, channelConfig: { ...current.channelConfig, opencloudName: event.target.value } }))} />
               </label>
               <label className="field">
-                <span>主 Agent 地址</span>
+                <span>主执行 Agent 地址</span>
                 <input value={preferences.channelConfig.opencloudUrl} onChange={(event) => setPreferences((current) => ({ ...current, channelConfig: { ...current.channelConfig, opencloudUrl: event.target.value } }))} />
               </label>
               <label className="field">
-                <span>备用 Agent 名称</span>
+                <span>备用执行 Agent 名称</span>
                 <input value={preferences.channelConfig.codexName} onChange={(event) => setPreferences((current) => ({ ...current, channelConfig: { ...current.channelConfig, codexName: event.target.value } }))} />
               </label>
               <label className="field">
-                <span>备用 Agent 地址</span>
+                <span>备用执行 Agent 地址</span>
                 <input value={preferences.channelConfig.codexUrl} onChange={(event) => setPreferences((current) => ({ ...current, channelConfig: { ...current.channelConfig, codexUrl: event.target.value } }))} />
               </label>
               <label className="field">
@@ -1577,7 +1674,7 @@ function App() {
               </label>
             </div>
 
-            <button className="primary-button" type="button" onClick={handleSavePreferences} disabled={savingPreferences}>{savingPreferences ? '保存中…' : '保存 Agent 连接'}</button>
+            <button className="primary-button" type="button" onClick={handleSavePreferences} disabled={savingPreferences}>{savingPreferences ? '保存中…' : '保存执行 Agent 配置'}</button>
           </section>
         ) : null}
 
