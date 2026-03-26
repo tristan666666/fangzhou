@@ -9,7 +9,6 @@
 .login-layout,
 .shell-layout,
 .task-workspace,
-.conversation-shell,
 .form-grid.two,
 .meta-grid,
 .draft-grid,
@@ -30,11 +29,8 @@
 .auth-card,
 .composer-panel,
 .stack-panel,
-.table-shell,
 .form-shell,
-.conversation-list,
 .message-shell,
-.assistant-shell,
 .channel-card {
   background: #ffffff;
   border: 1px solid #e6e7eb;
@@ -46,11 +42,8 @@
 .auth-card,
 .composer-panel,
 .stack-panel,
-.table-shell,
 .form-shell,
-.conversation-list,
-.message-shell,
-.assistant-shell {
+.message-shell {
   border-radius: 18px;
   padding: 20px;
 }
@@ -107,8 +100,6 @@
 .suggestion-list,
 .action-column,
 .message-shell,
-.assistant-shell,
-.conversation-list,
 .form-grid,
 .page-shell {
   display: grid;
@@ -121,7 +112,6 @@
 .section-head,
 .top-context,
 .context-meta,
-.bulk-toolbar,
 .sidebar-top,
 .sidebar-bottom {
   display: flex;
@@ -132,11 +122,9 @@
 .tab-button,
 .nav-item,
 .task-chip,
-.conversation-chip,
 .sample-pill,
 .secondary-button,
 .primary-button,
-.table-row,
 .timeline-row.action,
 .suggestion-card {
   transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
@@ -156,9 +144,7 @@
 .secondary-button,
 .nav-item,
 .task-chip,
-.conversation-chip,
 .sample-pill,
-.table-row,
 .suggestion-card {
   border-radius: 14px;
 }
@@ -173,10 +159,8 @@
 .tab-button.active,
 .nav-item.active,
 .task-chip.active,
-.conversation-chip.active,
 .sample-pill:hover,
-.secondary-button:hover,
-.table-row.active {
+.secondary-button:hover {
   background: rgba(16, 163, 127, 0.1);
   border-color: rgba(16, 163, 127, 0.28);
 }
@@ -186,10 +170,8 @@
 .primary-button:hover,
 .nav-item:hover,
 .task-chip:hover,
-.conversation-chip:hover,
 .sample-pill:hover,
-.suggestion-card:hover,
-.table-row:hover {
+.suggestion-card:hover {
   transform: translateY(-1px);
 }
 
@@ -229,10 +211,7 @@
 
 .field input,
 .field select,
-.field textarea,
-.inline-search,
-.bulk-toolbar input,
-.bulk-toolbar select {
+.field textarea {
   width: 100%;
   border: 1px solid #d8dbe2;
   border-radius: 14px;
@@ -796,66 +775,6 @@
   line-height: 1.6;
 }
 
-.table-shell {
-  overflow: hidden;
-}
-
-.table-head,
-.table-row {
-  display: grid;
-  grid-template-columns: 28px 1.2fr 1fr 80px 110px 120px 1.2fr;
-  gap: 10px;
-  align-items: center;
-}
-
-.table-head {
-  padding: 0 18px 12px;
-  color: rgba(22, 36, 28, 0.58);
-  font-size: 12px;
-}
-
-.table-row {
-  width: 100%;
-  padding: 14px 18px;
-  border: 0;
-  border-top: 1px solid rgba(20, 33, 26, 0.08);
-  background: rgba(255, 255, 255, 0.34);
-  text-align: left;
-}
-
-.table-row small {
-  display: block;
-  color: rgba(22, 36, 28, 0.58);
-}
-
-.bulk-toolbar {
-  flex-wrap: wrap;
-  padding: 14px;
-  border-radius: 18px;
-  background: #ffffff;
-  border: 1px solid #e6e7eb;
-}
-
-.bulk-toolbar span {
-  font-weight: 700;
-}
-
-.conversation-shell {
-  grid-template-columns: 260px minmax(0, 1fr) 320px;
-  gap: 16px;
-}
-
-.conversation-chip {
-  width: 100%;
-  border: 1px solid #e6e7eb;
-  background: #fafafa;
-  color: #1f2328;
-  padding: 12px;
-  text-align: left;
-  display: grid;
-  gap: 6px;
-}
-
 .message-list {
   min-height: 420px;
   max-height: 520px;
@@ -1035,7 +954,6 @@
   .login-layout,
   .shell-layout,
   .task-workspace,
-  .conversation-shell,
   .form-grid.two,
   .channel-grid,
   .draft-grid,
@@ -1072,16 +990,4 @@
     max-height: 420px;
   }
 
-  .table-head {
-    display: none;
-  }
-
-  .table-row {
-    grid-template-columns: 24px 1fr;
-    gap: 10px;
-  }
-
-  .table-row > span:nth-child(n + 3) {
-    grid-column: 2;
-  }
 }

@@ -22,10 +22,6 @@ const navItems = [
   { id: 'settings', label: '系统偏好' },
 ]
 
-const funnelOrder = ['已抓取', '初筛通过', '已触达', '已回复', '洽谈中', '已确认合作', '待人工接管']
-const handlingOptions = ['自动触达', 'AI辅助回复', '人工接管']
-const stageOptions = ['已抓取', '初筛通过', '已触达', '已回复', '洽谈中', '已确认合作', '待人工接管']
-
 const emptyDashboard = {
   brandId: '',
   overview: {
@@ -491,19 +487,11 @@ function App() {
   const [creatingTask, setCreatingTask] = useState(false)
   const [selectedTaskId, setSelectedTaskId] = useState('')
   const [selectedLeadId, setSelectedLeadId] = useState('')
-  const [selectedLeadIds, setSelectedLeadIds] = useState([])
   const [replyDraft, setReplyDraft] = useState('')
   const [refillDraft, setRefillDraft] = useState('')
   const [workspaceMessage, setWorkspaceMessage] = useState('')
   const [savingPreferences, setSavingPreferences] = useState(false)
-  const [savingBulk, setSavingBulk] = useState(false)
   const [taskSearch, setTaskSearch] = useState('')
-  const [assetSearch, setAssetSearch] = useState('')
-  const [bulkStatus, setBulkStatus] = useState('')
-  const [bulkHandling, setBulkHandling] = useState('')
-  const [bulkNextAction, setBulkNextAction] = useState('')
-  const [bulkReminderNote, setBulkReminderNote] = useState('')
-  const [bulkReminderAt, setBulkReminderAt] = useState('')
   const visibleBrands = useMemo(() => {
     if (user?.username === 'demo@fangzhou.ai') {
       return brands.filter((item) => item.id === 'brand-demo-2')
@@ -536,17 +524,6 @@ function App() {
 
   const currentTaskId = activeTask?.id || ''
   const currentLeads = useMemo(() => dashboard.leadsByTask?.[currentTaskId] || [], [dashboard.leadsByTask, currentTaskId])
-
-  const filteredLeads = useMemo(() => {
-    const keyword = assetSearch.trim().toLowerCase()
-    if (!keyword) return currentLeads
-    return currentLeads.filter((lead) =>
-      [lead.name, lead.platform, lead.contact, lead.status, lead.handling, lead.notes]
-        .join(' ')
-        .toLowerCase()
-        .includes(keyword),
-    )
-  }, [assetSearch, currentLeads])
 
   const activeLead = useMemo(() => {
     return currentLeads.find((lead) => lead.id === selectedLeadId) || currentLeads[0] || null
@@ -683,7 +660,6 @@ function App() {
       setPreferences(sanitizePreferences(prefs))
       setSelectedTaskId((current) => current || dash.activeTaskId || dash.tasks?.[0]?.id || '')
       setSelectedLeadId('')
-      setSelectedLeadIds([])
     } catch (error) {
       setWorkspaceMessage(error.message)
     }
@@ -830,40 +806,6 @@ function App() {
     }
   }
 
-  async function handleBulkApply() {
-    if (!selectedLeadIds.length) return
-    setSavingBulk(true)
-    try {
-      await apiFetch(
-        '/api/leads/bulk-update',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            ids: selectedLeadIds,
-            status: bulkStatus || undefined,
-            handling: bulkHandling || undefined,
-            nextAction: bulkNextAction || undefined,
-            reminderAt: bulkReminderAt || undefined,
-            reminderNote: bulkReminderNote || undefined,
-          }),
-        },
-        token,
-      )
-      setSelectedLeadIds([])
-      setBulkStatus('')
-      setBulkHandling('')
-      setBulkNextAction('')
-      setBulkReminderAt('')
-      setBulkReminderNote('')
-      await refreshWorkspace()
-      setWorkspaceMessage('批量操作已应用。')
-    } catch (error) {
-      setWorkspaceMessage(error.message)
-    } finally {
-      setSavingBulk(false)
-    }
-  }
-
   async function handleSavePreferences() {
     if (!brandId) return
     setSavingPreferences(true)
@@ -943,10 +885,6 @@ function App() {
   function openProfile(lead) {
     openExternal(buildResearchUrl(lead))
     setWorkspaceMessage('已打开这个对象的公开资料搜索页。你可以先看频道、主页、联系方式，再决定怎么跟进。')
-  }
-
-  function toggleLeadSelection(id) {
-    setSelectedLeadIds((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
   }
 
   if (bootstrapping) {
@@ -1346,172 +1284,6 @@ function App() {
                 <p>先在上面的主输入框里写一个目标。创建后，这里会出现执行提示、进度和结果回填。</p>
               </div>
             )}
-          </section>
-        ) : null}
-
-        {currentPage === 'assets' ? (
-          <section className="page-shell">
-            <div className="panel-head">
-              <div>
-                <p className="eyebrow">资产</p>
-                <h3>把每次触达沉淀成品牌自己的合作资产</h3>
-              </div>
-              <input className="inline-search" placeholder="搜索名称、平台、状态" value={assetSearch} onChange={(event) => setAssetSearch(event.target.value)} />
-            </div>
-
-            {selectedLeadIds.length ? (
-              <div className="bulk-toolbar">
-                <span>已选 {selectedLeadIds.length} 条</span>
-                <select value={bulkStatus} onChange={(event) => setBulkStatus(event.target.value)}>
-                  <option value="">批量改状态</option>
-                  {stageOptions.map((item) => <option key={item} value={item}>{item}</option>)}
-                </select>
-                <select value={bulkHandling} onChange={(event) => setBulkHandling(event.target.value)}>
-                  <option value="">批量改处理方式</option>
-                  {handlingOptions.map((item) => <option key={item} value={item}>{item}</option>)}
-                </select>
-                <input placeholder="下一步动作" value={bulkNextAction} onChange={(event) => setBulkNextAction(event.target.value)} />
-                <input type="datetime-local" value={bulkReminderAt} onChange={(event) => setBulkReminderAt(event.target.value)} />
-                <input placeholder="提醒备注" value={bulkReminderNote} onChange={(event) => setBulkReminderNote(event.target.value)} />
-                <button type="button" className="primary-button small" onClick={handleBulkApply} disabled={savingBulk}>{savingBulk ? '应用中…' : '应用'}</button>
-              </div>
-            ) : null}
-
-            {filteredLeads.length ? (
-              <div className="table-shell">
-                <div className="table-head">
-                  <span />
-                  <span>名称</span>
-                  <span>类型 / 平台</span>
-                  <span>匹配度</span>
-                  <span>状态</span>
-                  <span>处理方式</span>
-                  <span>下一步</span>
-                </div>
-                {filteredLeads.map((lead) => (
-                  <button key={lead.id} type="button" className={activeLead?.id === lead.id ? 'table-row active' : 'table-row'} onClick={() => setSelectedLeadId(lead.id)}>
-                    <span onClick={(event) => event.stopPropagation()}>
-                      <input type="checkbox" checked={selectedLeadIds.includes(lead.id)} onChange={() => toggleLeadSelection(lead.id)} />
-                    </span>
-                    <span><strong>{normalizeDisplayText(lead.name)}</strong><small>{lead.followers}</small></span>
-                    <span>{normalizeDisplayText(lead.platform)}</span>
-                    <span>{lead.fitScore}</span>
-                    <span><em className={`status-pill ${statusClass(lead.status)}`}>{normalizeDisplayText(lead.status)}</em></span>
-                    <span>{normalizeDisplayText(lead.handling)}</span>
-                    <span>{normalizeDisplayText(lead.nextAction)}</span>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="empty-workspace">
-                <strong>当前还没有资产</strong>
-                <p>先创建任务并回填结果，系统才会在这里沉淀对象、状态和下一步动作。</p>
-              </div>
-            )}
-
-            {filteredLeads.length && activeLead ? (
-              <div className="stack-panel">
-                <div className="panel-head">
-                  <div>
-                    <p className="eyebrow">当前对象</p>
-                    <h3>{normalizeDisplayText(activeLead.name)}</h3>
-                  </div>
-                  <em className={`status-pill ${statusClass(activeLead.status)}`}>{normalizeDisplayText(activeLead.status)}</em>
-                </div>
-                <div className="meta-grid">
-                  <div><span>平台</span><strong>{normalizeDisplayText(activeLead.platform)}</strong></div>
-                  <div><span>处理方式</span><strong>{normalizeDisplayText(activeLead.handling)}</strong></div>
-                  <div className="wide"><span>下一步</span><strong>{normalizeDisplayText(activeLead.nextAction)}</strong></div>
-                </div>
-                <div className="action-row wrap">
-                  <button type="button" className="secondary-button" onClick={() => openProfile(activeLead)}>查看公开资料</button>
-                  <button type="button" className="secondary-button" onClick={() => openGmail(activeLead)}>用邮件草稿跟进</button>
-                  <button type="button" className="secondary-button" onClick={() => openWhatsApp(activeLead)}>用 WhatsApp 跟进</button>
-                </div>
-              </div>
-            ) : null}
-          </section>
-        ) : null}
-
-        {currentPage === 'conversations' ? (
-          <section className="conversation-shell">
-            <div className="conversation-list">
-              <div className="panel-head">
-                <div>
-                  <p className="eyebrow">沟通记录</p>
-                  <h3>集中处理回复</h3>
-                </div>
-              </div>
-              {recentConversations.length ? recentConversations.map((lead) => (
-                <button key={lead.id} type="button" className={activeLead?.id === lead.id ? 'conversation-chip active' : 'conversation-chip'} onClick={() => { setSelectedTaskId(lead.taskId); setSelectedLeadId(lead.id) }}>
-                  <strong>{normalizeDisplayText(lead.name)}</strong>
-                  <span>{normalizeDisplayText(lead.platform)} · {normalizeDisplayText(lead.status)}</span>
-                </button>
-              )) : <div className="empty-copy dark">还没有需要处理的会话。</div>}
-            </div>
-
-            <div className="message-shell">
-              <div className="panel-head">
-                <div>
-                  <p className="eyebrow">当前会话</p>
-                  <h3>{activeLead ? normalizeDisplayText(activeLead.name) : '暂无对象'}</h3>
-                </div>
-                {activeLead ? <em className={`status-pill ${statusClass(activeLead.status)}`}>{normalizeDisplayText(activeLead.status)}</em> : null}
-              </div>
-
-              {activeLead ? (
-                <>
-                  <div className="message-list">
-                    {(activeLead.conversation || []).map((message) => (
-                      <div key={message.id} className={`message-bubble ${message.role === 'creator' ? 'incoming' : 'outgoing'}`}>
-                        <span>{message.role === 'creator' ? '对方' : message.role === 'agent' ? '我方' : '系统'}</span>
-                        <p>{message.text}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="composer-inline">
-                    <textarea placeholder="在这里写回复。系统会把这条消息保存到当前会话。" value={replyDraft} onChange={(event) => setReplyDraft(event.target.value)} />
-                    <div className="action-row">
-                      <button type="button" className="primary-button" onClick={handleSendMessage}>保存到案件记录</button>
-                      <button type="button" className="secondary-button" onClick={() => openGmail(activeLead)}>用邮件草稿跟进</button>
-                      <button type="button" className="secondary-button" onClick={() => openWhatsApp(activeLead)}>用 WhatsApp 跟进</button>
-                      <button type="button" className="secondary-button" onClick={() => handleLeadPatch({ status: '待人工接管', handling: '人工接管' })}>标记待接管</button>
-                      <button type="button" className="secondary-button" onClick={() => handleLeadPatch({ status: '洽谈中' })}>标记洽谈中</button>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="empty-workspace compact">
-                  <strong>还没有会话</strong>
-                  <p>等任务回填并产生对象后，这里会集中处理回复和跟进。</p>
-                </div>
-              )}
-            </div>
-
-            <div className="assistant-shell">
-              <div className="panel-head">
-                <div>
-                  <p className="eyebrow">副驾驶</p>
-                  <h3>当前建议</h3>
-                </div>
-              </div>
-              <div className="suggestion-list">
-                {taskSuggestions.map((item) => (
-                  <button key={item.title} type="button" className="suggestion-card" onClick={() => setReplyDraft(item.body)}>
-                    <strong>{item.title}</strong>
-                    <p>{item.body}</p>
-                  </button>
-                ))}
-              </div>
-              {activeLead ? (
-                <div className="result-block">
-                  <strong>当前对象</strong>
-                  <p>{activeLead.name} · {activeLead.platform}</p>
-                  <p>{activeLead.nextAction}</p>
-                </div>
-              ) : null}
-            </div>
           </section>
         ) : null}
 

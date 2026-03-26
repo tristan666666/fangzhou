@@ -6,14 +6,12 @@
   "scripts": {
     "build": "vite build",
     "dev:web": "vite",
-    "start": "node server/index.js",
-    "connector": "node connector/index.js"
+    "start": "node server/index.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.2",
     "dotenv": "^17.3.1",
     "express": "^5.1.0",
-    "playwright-core": "^1.54.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
